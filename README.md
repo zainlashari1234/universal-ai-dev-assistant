@@ -218,10 +218,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- 📧 Email: support@uaida.dev
-- 💬 Discord: [Join our community](https://discord.gg/uaida)
-- 🐛 Issues: [GitHub Issues](https://github.com/username/universal-ai-dev-assistant/issues)
-- 📖 Docs: [Documentation](https://docs.uaida.dev)
+📧 Email: salih_31_12@hotmail.com                                                                                   
+💬 Discord: Coming soon!                                                                                            
+📖 Docs: [Documentation](docs/)                                                                                     
+🐛 Issues: [GitHub Issues](https://github.com/Tehlikeli107/universal-ai-dev-assistant/issues)                       
+
 
 ---
 
