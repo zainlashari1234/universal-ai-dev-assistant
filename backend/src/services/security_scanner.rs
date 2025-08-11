@@ -120,13 +120,13 @@ impl SecurityScanner {
             
             for (line_num, line) in lines.iter().enumerate() {
                 for rule in rules {
-                    if rule.pattern.is_match(line) {
+                    if let Some(mat) = rule.pattern.find(line) {
                         issues.push(SecurityIssue {
                             severity: rule.severity.clone(),
                             category: rule.category.clone(),
                             message: rule.message.clone(),
                             line: line_num + 1,
-                            column: 0, // TODO: Calculate exact column
+                            column: mat.start() + 1, // Exact column position
                             suggestion: rule.suggestion.clone(),
                         });
                     }
@@ -154,13 +154,13 @@ impl SecurityScanner {
 
         for (line_num, line) in lines.iter().enumerate() {
             for (pattern, message) in &secret_patterns {
-                if pattern.is_match(line) {
+                if let Some(mat) = pattern.find(line) {
                     issues.push(SecurityIssue {
                         severity: SecuritySeverity::High,
                         category: "Hardcoded Secrets".to_string(),
                         message: format!("{} detected", message),
                         line: line_num + 1,
-                        column: 0,
+                        column: mat.start() + 1,
                         suggestion: Some("Use environment variables or secure configuration".to_string()),
                     });
                 }

@@ -2,7 +2,7 @@
   "name": "universal-ai-dev-assistant",
   "displayName": "Universal AI Development Assistant",
   "description": "Privacy-focused, local AI-powered development assistant",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "uaida",
   "engines": {
     "vscode": "^1.74.0"

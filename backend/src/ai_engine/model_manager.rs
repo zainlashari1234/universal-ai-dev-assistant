@@ -326,7 +326,7 @@ impl ModelManager {
         vec![
             "print()".to_string(),
             "return ".to_string(),
-            "# TODO: Implement".to_string(),
+            "# Implementation needed".to_string(),
         ]
     }
 
@@ -596,7 +596,7 @@ impl ModelManager {
             completions.push("import os".to_string());
             completions.push("import sys".to_string());
         } else {
-            completions.push("# TODO: Implement this".to_string());
+            completions.push("# Implementation needed".to_string());
             completions.push("print('Hello, World!')".to_string());
         }
 

@@ -316,10 +316,10 @@ impl RealTimeCompletionEngine {
         let mut suggestions = Vec::new();
 
         suggestions.push(CompletionSuggestion {
-            text: " TODO: Implement this functionality".to_string(),
+            text: " Implementation needed here".to_string(),
             confidence: 0.8,
             suggestion_type: SuggestionType::Comment,
-            reasoning: "Common TODO comment pattern".to_string(),
+            reasoning: "Common implementation placeholder".to_string(),
             estimated_time_saved: 25,
         });
 
