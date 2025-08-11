@@ -9,6 +9,17 @@ use crate::{config::Config, CompletionRequest};
 pub mod code_completion;
 pub mod code_analysis;
 pub mod model_manager;
+pub mod multi_agent_system;
+pub mod predictive_debugging;
+pub mod real_time_completion;
+pub mod emotional_ai_programming;
+pub mod musical_code_composition;
+pub mod quantum_code_optimization;
+pub mod competitive_programming_arena;
+pub mod code_smell_detector;
+pub mod intelligent_autocomplete;
+pub mod code_time_travel;
+pub mod ai_pair_programming;
 
 use model_manager::ModelManager;
 
