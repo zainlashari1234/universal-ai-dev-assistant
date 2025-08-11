@@ -13,6 +13,8 @@ use tower_http::cors::CorsLayer;
 use tracing::{info, warn};
 
 mod ai_engine;
+mod api;
+mod collaboration;
 mod config;
 mod language_server;
 mod models;
@@ -157,11 +159,23 @@ async fn main() -> Result<()> {
         config: config.clone(),
     };
 
+    // Initialize collaboration services
+    let team_sync = Arc::new(tokio::sync::RwLock::new(collaboration::TeamSyncManager::new()));
+    let collaboration_engine = Arc::new(tokio::sync::RwLock::new(collaboration::RealTimeCollaborationEngine::new()));
+    let code_reviewer = Arc::new(tokio::sync::RwLock::new(collaboration::AICodeReviewer::new(None)));
+    
+    let collaboration_state = Arc::new(api::CollaborationState {
+        team_sync,
+        collaboration_engine,
+        code_reviewer,
+    });
+
     // Build our application with routes
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/api/v1/complete", post(complete_code))
         .route("/api/v1/analyze", post(analyze_code))
+        .nest("/api/v1/collaboration", api::collaboration_routes().with_state(collaboration_state))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
