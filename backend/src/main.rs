@@ -78,9 +78,11 @@ async fn complete_code(
         Ok(suggestions) => {
             let processing_time = start_time.elapsed().as_millis() as u64;
             
+            let confidence = calculate_confidence(&suggestions, &request);
+            
             Ok(Json(CompletionResponse {
                 suggestions,
-                confidence: 0.85, // TODO: Calculate actual confidence
+                confidence,
                 processing_time_ms: processing_time,
             }))
         }
@@ -102,6 +104,34 @@ async fn analyze_code(
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
+}
+
+fn calculate_confidence(suggestions: &[String], request: &CompletionRequest) -> f32 {
+    if suggestions.is_empty() {
+        return 0.0;
+    }
+    
+    let mut confidence = 0.5; // Base confidence
+    
+    // Increase confidence based on context quality
+    if !request.context.as_ref().unwrap_or(&String::new()).is_empty() {
+        confidence += 0.2;
+    }
+    
+    // Increase confidence based on suggestion quality
+    let avg_length = suggestions.iter().map(|s| s.len()).sum::<usize>() as f32 / suggestions.len() as f32;
+    if avg_length > 10.0 && avg_length < 100.0 {
+        confidence += 0.2;
+    }
+    
+    // Increase confidence if suggestions are diverse
+    let unique_suggestions = suggestions.iter().collect::<std::collections::HashSet<_>>().len();
+    if unique_suggestions == suggestions.len() {
+        confidence += 0.1;
+    }
+    
+    // Cap confidence at 0.95
+    confidence.min(0.95)
 }
 
 #[tokio::main]
