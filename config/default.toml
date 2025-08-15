@@ -1,0 +1,155 @@
+# P0 Day-5: Default configuration with feature flags
+# Universal AI Development Assistant Configuration
+
+[server]
+host = "0.0.0.0"
+port = 8080
+workers = 4
+request_timeout_ms = 30000
+max_request_size_mb = 10
+
+[database]
+url = "postgresql://uaida:uaida123@localhost:5432/uaida_dev"
+max_connections = 10
+connection_timeout_ms = 5000
+migration_timeout_ms = 30000
+
+[ai]
+default_provider = "ollama"
+default_model = "qwen2.5-coder:7b-instruct"
+max_tokens = 2048
+temperature = 0.2
+timeout_ms = 30000
+
+[ai.providers.ollama]
+enabled = true
+endpoint = "http://localhost:11434"
+models = ["qwen2.5-coder:7b-instruct", "codellama:7b-code"]
+
+[ai.providers.openai]
+enabled = false
+api_key = "${OPENAI_API_KEY}"
+models = ["gpt-4", "gpt-3.5-turbo"]
+
+[ai.providers.anthropic]
+enabled = false
+api_key = "${ANTHROPIC_API_KEY}"
+models = ["claude-3-sonnet", "claude-3-haiku"]
+
+[features]
+# Experimental features (can be toggled)
+experimental_risk_gate = true
+experimental_advanced_tracing = true
+experimental_ai_code_review = false
+experimental_auto_fix = false
+experimental_multi_provider = true
+
+# Production features
+enable_metrics = true
+enable_tracing = true
+enable_security_headers = true
+enable_rate_limiting = true
+enable_cors = true
+enable_database_persistence = true
+
+# Evaluation features
+enable_evaluations = true
+auto_run_evals = false
+eval_schedule_cron = "0 2 * * *"  # Daily at 2 AM
+
+[features.toggles]
+# Feature flags for A/B testing
+use_new_completion_algorithm = false
+enable_collaborative_editing = false
+enable_voice_commands = false
+enable_mobile_support = false
+
+[observability]
+# OpenTelemetry configuration
+service_name = "uaida-backend"
+jaeger_endpoint = "http://localhost:14268/api/traces"
+otlp_endpoint = "http://localhost:4317"
+enable_tracing = true
+trace_sampling_rate = 1.0
+
+# Metrics configuration
+metrics_endpoint = "/metrics"
+enable_custom_metrics = true
+histogram_buckets = [0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+
+[security]
+# Rate limiting
+rate_limit_per_second = 10
+rate_limit_burst = 50
+rate_limit_window_ms = 60000
+
+# CORS configuration
+cors_allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+cors_max_age_seconds = 3600
+
+# Security headers
+enable_security_headers = true
+content_security_policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none';"
+
+[risk_gate]
+# Coverage thresholds
+min_coverage_threshold = 80.0
+max_coverage_drop = 5.0
+
+# Performance thresholds
+max_performance_degradation = 25.0
+max_execution_time_ms = 300000
+memory_threshold_mb = 512.0
+
+# Risk scoring weights
+coverage_weight = 0.3
+performance_weight = 0.3
+security_weight = 0.25
+breaking_changes_weight = 0.15
+
+# Blocking thresholds
+risk_threshold = 0.6
+auto_block_critical = true
+
+[evaluations]
+# Suite configuration
+default_suites = ["HumanEval+", "SWE-bench Lite", "Code Completion"]
+output_directory = "docs/evals"
+generate_html_reports = true
+update_readme_badges = true
+
+# Evaluation scheduling
+enable_scheduled_evals = false
+schedule_cron = "0 2 * * 0"  # Weekly on Sunday at 2 AM
+max_concurrent_evals = 2
+
+[logging]
+level = "info"
+format = "json"
+output = "stdout"
+enable_file_logging = false
+log_file_path = "logs/uaida.log"
+max_log_file_size_mb = 100
+max_log_files = 5
+
+[context]
+# Context management
+max_context_size = 8192
+context_window_overlap = 512
+enable_smart_context_selection = true
+context_cache_size_mb = 256
+
+[sandbox]
+# Code execution sandbox
+enable_sandbox = true
+timeout_seconds = 30
+memory_limit_mb = 128
+cpu_limit_percent = 50
+allowed_languages = ["python", "javascript", "rust", "go"]
+
+[collaboration]
+# Real-time collaboration features
+enable_collaboration = false
+websocket_port = 8081
+max_collaborators_per_project = 10
+session_timeout_minutes = 30

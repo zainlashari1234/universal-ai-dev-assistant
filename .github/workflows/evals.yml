@@ -1,0 +1,64 @@
+name: 📊 Evaluations Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Evaluation suite (humaneval|swebench_lite)'
+        required: false
+        default: 'humaneval'
+      model:
+        description: 'Model identifier'
+        required: false
+        default: 'local-qwen'
+
+jobs:
+  run-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install jq
+
+      - name: 🧰 Ensure docs/evals directory
+        run: |
+          mkdir -p docs/evals
+
+      - name: 📥 Download datasets
+        run: |
+          bash scripts/evals/download_datasets.sh
+
+      - name: ▶️ Run evaluation (HumanEval+)
+        if: ${{ github.event.inputs.suite == '' || github.event.inputs.suite == 'humaneval' }}
+        run: |
+          ts=$(date -u +"%Y%m%d-%H%M%S")
+          out_dir="docs/evals/humaneval/${ts}"
+          mkdir -p "$out_dir"
+          python scripts/evals/run_humaneval.py --model "${{ github.event.inputs.model }}" | tee "$out_dir/results.txt"
+          # Minimal JSON summary
+          echo "{\n  \"suite\": \"HumanEval+\",\n  \"model\": \"${{ github.event.inputs.model }}\",\n  \"timestamp\": \"$ts\"\n}" > "$out_dir/results.json"
+
+      - name: ▶️ Run evaluation (SWE-bench Lite)
+        if: ${{ github.event.inputs.suite == 'swebench_lite' }}
+        run: |
+          ts=$(date -u +"%Y%m%d-%H%M%S")
+          out_dir="docs/evals/swebench_lite/${ts}"
+          mkdir -p "$out_dir"
+          bash scripts/evals/run_swebench_lite.sh --model "${{ github.event.inputs.model }}" | tee "$out_dir/results.txt"
+          echo "{\n  \"suite\": \"SWE-bench Lite\",\n  \"model\": \"${{ github.event.inputs.model }}\",\n  \"timestamp\": \"$ts\"\n}" > "$out_dir/results.json"
+
+      - name: 📤 Commit results
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: 'docs/evals'
+          message: 'ci(evals): publish ${{ github.event.inputs.suite || 'humaneval' }} results'
+          default_author: github_actions

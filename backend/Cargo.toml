@@ -10,11 +10,20 @@ keywords = ["ai", "development", "assistant", "code", "completion"]
 categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
+# OpenTelemetry tracing dependencies for P0 Day-2
+opentelemetry = "0.21"
+opentelemetry-jaeger = "0.20"
+opentelemetry-otlp = "0.14"
+opentelemetry-semantic-conventions = "0.13"
+tracing-opentelemetry = "0.22"
 # Web framework
 tokio = { version = "1.0", features = ["full"] }
 axum = "0.7"
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "fs"] }
+# Security guardrails for P0 Day-2
+tower-governor = "0.1"
+headers = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
@@ -29,8 +38,8 @@ hf-hub = "0.3"
 tower-lsp = "0.20"
 lsp-types = "0.94"
 
-# Database
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+# Database - P0 Day-3: Postgres migrations
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "sqlite", "chrono", "uuid", "migrate"] }
 
 # Utilities
 uuid = { version = "1.0", features = ["v4", "serde"] }
@@ -44,16 +53,32 @@ clap = { version = "4.0", features = ["derive"] }
 reqwest = { version = "0.11", features = ["json"] }
 toml = "0.8"
 regex = "1.10"
+async-trait = "0.1"
+fastrand = "2.0"
 
-# File handling
-walkdir = "2.3"
-ignore = "0.4"
+# Observability
+prometheus = "0.13"
+opentelemetry = "0.20"
+
+# Additional utilities
+
+# Authentication and security
+jsonwebtoken = "9.2"
+oauth2 = "4.4"
+bcrypt = "0.15"
+argon2 = "0.5"
+
+# Tree-sitter for AST parsing
 tree-sitter = "0.20"
 tree-sitter-python = "0.20"
 tree-sitter-javascript = "0.20"
 tree-sitter-typescript = "0.20"
 tree-sitter-rust = "0.20"
 tree-sitter-go = "0.20"
+
+# File handling (deduplicated)
+walkdir = "2.3"
+ignore = "0.4"
 
 [dev-dependencies]
 tempfile = "3.8"

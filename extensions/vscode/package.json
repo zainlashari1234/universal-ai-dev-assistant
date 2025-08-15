@@ -1,126 +1,131 @@
 {
-  "name": "universal-ai-dev-assistant",
+  "name": "uaida-vscode",
   "displayName": "Universal AI Development Assistant",
-  "description": "Privacy-focused, local AI-powered development assistant",
-  "version": "0.2.0",
+  "description": "AI-powered development assistant with autonomous PRs",
+  "version": "1.0.0",
   "publisher": "uaida",
   "engines": {
     "vscode": "^1.74.0"
   },
   "categories": [
-    "Programming Languages",
+    "Other",
     "Machine Learning",
-    "Snippets",
-    "Other"
+    "Programming Languages"
   ],
   "keywords": [
     "ai",
     "assistant",
-    "code completion",
-    "development",
-    "productivity"
+    "code-generation",
+    "testing",
+    "automation"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onCommand:uaida.plan",
+    "onCommand:uaida.patch",
+    "onCommand:uaida.test",
+    "onCommand:uaida.review",
+    "onCommand:uaida.rollback"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "uaida.complete",
-        "title": "AI Complete",
-        "category": "UAIDA"
+        "command": "uaida.plan",
+        "title": "UAIDA: Create Plan",
+        "icon": "$(lightbulb)"
       },
       {
-        "command": "uaida.analyze",
-        "title": "Analyze Code",
-        "category": "UAIDA"
+        "command": "uaida.patch",
+        "title": "UAIDA: Apply Patch",
+        "icon": "$(git-commit)"
       },
       {
-        "command": "uaida.refactor",
-        "title": "Suggest Refactoring",
-        "category": "UAIDA"
+        "command": "uaida.test",
+        "title": "UAIDA: Run Tests",
+        "icon": "$(beaker)"
       },
       {
-        "command": "uaida.generateDocs",
-        "title": "Generate Documentation",
-        "category": "UAIDA"
+        "command": "uaida.review",
+        "title": "UAIDA: Code Review",
+        "icon": "$(checklist)"
       },
       {
-        "command": "uaida.generateTests",
-        "title": "Generate Tests",
-        "category": "UAIDA"
+        "command": "uaida.rollback",
+        "title": "UAIDA: Rollback",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "uaida.showDiff",
+        "title": "UAIDA: Show Diff",
+        "icon": "$(diff)"
       }
     ],
-    "keybindings": [
-      {
-        "command": "uaida.complete",
-        "key": "ctrl+space",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "uaida.analyze",
-        "key": "ctrl+shift+a",
-        "when": "editorTextFocus"
-      }
-    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "uaida.plan",
+          "group": "uaida@1",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "uaida.patch",
+          "group": "uaida@2"
+        },
+        {
+          "command": "uaida.test",
+          "group": "uaida@3"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "uaida.plan",
+          "group": "uaida@1"
+        }
+      ]
+    },
     "configuration": {
-      "title": "Universal AI Dev Assistant",
+      "title": "UAIDA Configuration",
       "properties": {
         "uaida.serverUrl": {
           "type": "string",
-          "default": "http://127.0.0.1:8080",
-          "description": "UAIDA server URL"
+          "default": "http://localhost:8080",
+          "description": "UAIDA backend server URL"
         },
-        "uaida.enableAutoComplete": {
+        "uaida.autoApplyPatches": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically apply patches without confirmation"
+        },
+        "uaida.showDiffPreview": {
           "type": "boolean",
           "default": true,
-          "description": "Enable automatic code completion"
+          "description": "Show diff preview before applying patches"
         },
-        "uaida.enableCodeAnalysis": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable real-time code analysis"
-        },
-        "uaida.maxSuggestions": {
+        "uaida.maxFileSize": {
           "type": "number",
-          "default": 5,
-          "description": "Maximum number of suggestions to show"
-        },
-        "uaida.completionDelay": {
-          "type": "number",
-          "default": 300,
-          "description": "Delay in milliseconds before triggering completion"
+          "default": 1000000,
+          "description": "Maximum file size to process (bytes)"
         }
       }
     },
-    "languages": [
-      {
-        "id": "python",
-        "extensions": [".py"],
-        "aliases": ["Python"]
-      },
-      {
-        "id": "javascript",
-        "extensions": [".js", ".jsx"],
-        "aliases": ["JavaScript"]
-      },
-      {
-        "id": "typescript",
-        "extensions": [".ts", ".tsx"],
-        "aliases": ["TypeScript"]
-      },
-      {
-        "id": "rust",
-        "extensions": [".rs"],
-        "aliases": ["Rust"]
-      },
-      {
-        "id": "go",
-        "extensions": [".go"],
-        "aliases": ["Go"]
-      }
-    ]
+    "views": {
+      "explorer": [
+        {
+          "id": "uaidaExplorer",
+          "name": "UAIDA Assistant",
+          "when": "workspaceHasFolder"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "uaida",
+          "title": "UAIDA",
+          "icon": "$(robot)"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -129,8 +134,7 @@
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
-    "package": "vsce package",
-    "publish": "vsce publish"
+    "package": "vsce package"
   },
   "devDependencies": {
     "@types/vscode": "^1.74.0",
@@ -141,8 +145,9 @@
     "typescript": "^4.9.4",
     "@vscode/test-electron": "^2.2.0",
     "vsce": "^2.15.0"
-  },
+  ],
   "dependencies": {
-    "axios": "^1.6.0"
+    "axios": "^1.6.0",
+    "ws": "^8.14.0"
   }
 }

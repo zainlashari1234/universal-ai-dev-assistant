@@ -1,0 +1,16 @@
+{
+  "name": "node-toy-fixture",
+  "version": "1.0.0",
+  "description": "Test fixture for Node.js sandbox testing",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "start": "node index.js"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  }
+}

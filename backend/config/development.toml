@@ -1,0 +1,60 @@
+# P0 Task #7: Development Configuration Override
+# Universal AI Development Assistant - Development Environment
+
+[server]
+host = "127.0.0.1"
+port = 8080
+workers = 2
+cors_origins = ["*"]  # Allow all origins in development
+
+[database]
+url = "sqlite://dev_uaida.db"
+auto_migrate = true
+
+[ai_engine]
+temperature = 0.2  # More creative in development
+
+[providers]
+policy = "local_first"
+
+[providers.openai]
+enabled = false  # Disabled by default in dev to save costs
+
+[providers.anthropic]
+enabled = false  # Disabled by default in dev to save costs
+
+[sandbox]
+timeout_seconds = 120  # Shorter timeout for faster feedback
+
+[agents]
+budget_limit_usd = 0.5  # Lower budget in development
+
+[observability]
+log_level = "debug"
+tracing_enabled = true
+
+[observability.tracing]
+sample_rate = 1.0  # Sample everything in development
+
+[security]
+rate_limiting_enabled = false  # Disabled for easier development
+
+[feature]
+# Enable experimental features in development
+experimental = [
+    "emotional_ai",
+    "advanced_reasoning",
+    "auto_documentation"
+]
+
+[cache]
+ttl_seconds = 300  # Shorter cache in development
+max_size_mb = 50
+
+[evaluation]
+auto_publish = false  # Don't auto-publish in development
+
+[deployment]
+environment = "development"
+debug = true
+hot_reload = true

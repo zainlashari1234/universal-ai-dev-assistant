@@ -1,0 +1,89 @@
+# P0 Day-2: CI Security Policies (fail-on-high)
+name: Security Checks
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security Analysis
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Run Semgrep
+      uses: returntocorp/semgrep-action@v1
+      with:
+        config: >-
+          p/security-audit
+          p/secrets
+          p/rust
+        generateSarif: "1"
+        
+    - name: Upload Semgrep results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: semgrep.sarif
+      if: always()
+        
+    - name: Fail on high severity findings
+      run: |
+        # Check if any HIGH or CRITICAL severity findings exist
+        if grep -q '"level":"ERROR"' semgrep.sarif; then
+          echo "❌ HIGH/CRITICAL security issues found!"
+          exit 1
+        fi
+        echo "✅ No high severity security issues found"
+        
+  dependency-check:
+    runs-on: ubuntu-latest
+    name: Dependency Vulnerability Scan
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+      
+    - name: Run cargo audit
+      run: |
+        cargo audit --deny warnings
+        
+    - name: Install cargo-deny
+      run: cargo install cargo-deny
+      
+    - name: Run cargo deny
+      run: cargo deny check
+      
+  code-quality:
+    runs-on: ubuntu-latest
+    name: Code Quality Gates
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
+        
+    - name: Run Clippy (fail on warnings)
+      run: |
+        cargo clippy --all-targets --all-features -- -D warnings
+        
+    - name: Check formatting
+      run: |
+        cargo fmt --all -- --check
+        
+    - name: Run tests
+      run: |
+        cargo test --all-features

@@ -1,4 +1,6 @@
 use anyhow::Result;
+use crate::observability::tracing::{init_tracing, shutdown_tracing};
+use crate::security::{security_headers_middleware, security_audit_middleware, create_rate_limit_layer, create_cors_layer};
 use axum::{
     extract::State,
     http::StatusCode,
@@ -19,14 +21,33 @@ mod config;
 mod language_server;
 mod models;
 mod services;
+mod context;
+mod sandbox;
+mod agents;
+mod observability;
+mod auth;
+mod security;
+mod database;
+mod risk;
+mod evals;
 
 use ai_engine::AIEngine;
+use ai_engine::providers::{ProviderRouter, OllamaProvider, HeuristicProvider};
 use config::Config;
+use context::ContextManager;
+use sandbox::SandboxConfig;
+use agents::{AgentOrchestrator, PlannerAgent, AgentConstraints};
+use observability::{init_metrics, get_metrics, observability_routes, init_tracing};
+use database::DatabaseManager;
 
 #[derive(Clone)]
 pub struct AppState {
     ai_engine: Arc<AIEngine>,
+    provider_router: Arc<ProviderRouter>,
+    context_manager: Arc<tokio::sync::RwLock<ContextManager>>,
+    agent_orchestrator: Arc<AgentOrchestrator>,
     config: Arc<Config>,
+    database: Arc<DatabaseManager>, // P0 Day-3: Database integration
 }
 
 #[derive(Serialize, Deserialize)]
@@ -53,10 +74,20 @@ pub struct HealthResponse {
 }
 
 async fn health_check(State(state): State<AppState>) -> Json<HealthResponse> {
+    let provider_health = state.provider_router.health().await.unwrap_or_else(|_| {
+        crate::ai_engine::providers::ProviderHealth {
+            available: false,
+            latency_ms: None,
+            model_loaded: false,
+            error: Some("Provider router unavailable".to_string()),
+            capabilities: vec![],
+        }
+    });
+
     Json(HealthResponse {
-        status: "healthy".to_string(),
+        status: if provider_health.available { "healthy".to_string() } else { "degraded".to_string() },
         version: env!("CARGO_PKG_VERSION").to_string(),
-        ai_model_loaded: state.ai_engine.is_model_loaded().await,
+        ai_model_loaded: provider_health.model_loaded,
         supported_languages: vec![
             "python".to_string(),
             "javascript".to_string(),
@@ -138,25 +169,69 @@ fn calculate_confidence(suggestions: &[String], request: &CompletionRequest) -> 
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
+    // P0 Task #2: Initialize OpenTelemetry tracing
+    init_tracing()?;
+    info!("OpenTelemetry tracing initialized");
 
     info!("Starting Universal AI Development Assistant v{}", env!("CARGO_PKG_VERSION"));
+    
+    // P0 Day-3: Initialize database connection and migrations
+    let database = Arc::new(DatabaseManager::new().await?);
+    info!("Database initialized and migrations completed");
+
+    // Initialize metrics
+    init_metrics();
+    info!("Metrics initialized");
 
     // Load configuration
-    let config = Arc::new(Config::load()?);
+    let config = Arc::new(Config::load())?;
     info!("Configuration loaded");
+
+    // Initialize Provider Router
+    let mut provider_router = ProviderRouter::new();
+    
+    // Add Ollama provider
+    let ollama_provider = OllamaProvider::new(
+        "http://localhost:11434".to_string(),
+        "qwen2.5-coder:7b-instruct".to_string(),
+    );
+    provider_router.add_provider(Box::new(ollama_provider));
+    
+    // Add heuristic fallback
+    let heuristic_provider = HeuristicProvider::new();
+    provider_router.add_provider(Box::new(heuristic_provider));
+    
+    let provider_router = Arc::new(provider_router);
+    info!("Provider router initialized");
 
     // Initialize AI engine
     let ai_engine = Arc::new(AIEngine::new(&config).await?);
     info!("AI engine initialized");
 
+    // Initialize Context Manager
+    let repo_path = std::env::current_dir()?;
+    let mut context_manager = ContextManager::new(repo_path)?;
+    context_manager.scan_repository().await?;
+    let context_manager = Arc::new(tokio::sync::RwLock::new(context_manager));
+    info!("Context manager initialized");
+
+    // Initialize Sandbox and Agent Orchestrator
+    let sandbox_config = SandboxConfig::default();
+    let agent_orchestrator = Arc::new(AgentOrchestrator::new(
+        provider_router.clone(),
+        context_manager.clone(),
+        sandbox_config,
+    ));
+    info!("Agent orchestrator initialized");
+
     // Create application state
     let state = AppState {
         ai_engine,
+        provider_router,
+        context_manager,
+        agent_orchestrator,
         config: config.clone(),
+        database: database.clone(), // P0 Day-3: Add database to app state
     };
 
     // Initialize collaboration services
@@ -176,7 +251,14 @@ async fn main() -> Result<()> {
         .route("/api/v1/complete", post(complete_code))
         .route("/api/v1/analyze", post(analyze_code))
         .nest("/api/v1/collaboration", api::collaboration_routes().with_state(collaboration_state))
-        .layer(CorsLayer::permissive())
+        .nest("/api/v1", api::agent_routes())
+        .nest("/api/v1", api::v1_routes())
+        .merge(observability::observability_routes())
+        // P0 Day-2: Security guardrails
+        .layer(axum::middleware::from_fn(security::security_headers_middleware))
+        .layer(axum::middleware::from_fn(security::security_audit_middleware))
+        .layer(security::create_rate_limit_layer())
+        .layer(security::create_cors_layer())
         .with_state(state);
 
     // Start the server
@@ -187,6 +269,9 @@ async fn main() -> Result<()> {
     info!("API documentation available at http://{}/docs", addr);
     
     axum::serve(listener, app).await?;
+    
+    // Shutdown tracing on exit
+    shutdown_tracing();
 
     Ok(())
 }

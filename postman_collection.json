@@ -1,0 +1,214 @@
+{
+	"info": {
+		"name": "Universal AI Development Assistant - API Collection",
+		"description": "Complete API collection for UAIDA NextGen Core",
+		"version": "1.0.0",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health",
+					"host": ["{{base_url}}"],
+					"path": ["health"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Metrics",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/metrics",
+					"host": ["{{base_url}}"],
+					"path": ["metrics"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "API Documentation",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/docs",
+					"host": ["{{base_url}}"],
+					"path": ["docs"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Code Completion",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"code\": \"def fibonacci(n):\\n    if n <= 1:\\n        return n\\n    return \",\n  \"language\": \"python\",\n  \"cursor_position\": 65,\n  \"context\": \"Mathematical functions\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/complete",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "complete"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Code Analysis",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"code\": \"def buggy_function(x, y):\\n    return x / y\",\n  \"language\": \"python\",\n  \"cursor_position\": 0,\n  \"context\": \"Function analysis\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/analyze",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "analyze"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Plan",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"goal\": \"Add error handling to division function\",\n  \"context\": {\n    \"files\": [\"src/math.py\"],\n    \"constraints\": {\n      \"max_files\": 5,\n      \"max_loc\": 100,\n      \"timeout_s\": 30\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/plan",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "plan"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Patch",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"plan_id\": \"plan_123\",\n  \"target_files\": [\"src/math.py\"],\n  \"changes\": [\n    {\n      \"file\": \"src/math.py\",\n      \"operation\": \"modify\",\n      \"content\": \"def safe_divide(a, b):\\n    if b == 0:\\n        raise ValueError('Division by zero')\\n    return a / b\"\n    }\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/patch",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "patch"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Run Tests",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"patch_id\": \"patch_123\",\n  \"test_command\": \"pytest\",\n  \"test_files\": [\"tests/test_math.py\"],\n  \"timeout_s\": 60\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/run-tests",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "run-tests"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Artifacts",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/artifacts/run_123",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "artifacts", "run_123"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Risk Report",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/risk-report/patch_123",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "risk-report", "patch_123"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Rollback (Stub)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"patch_id\": \"patch_123\",\n  \"reason\": \"Tests failed\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/rollback",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "rollback"]
+				}
+			},
+			"response": []
+		}
+	]
+}

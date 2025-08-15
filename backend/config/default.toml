@@ -1,0 +1,242 @@
+# P0 Task #7: Config & feature flags schema
+# Universal AI Development Assistant - Default Configuration
+
+[server]
+host = "127.0.0.1"
+port = 8080
+workers = 4
+max_connections = 1000
+request_timeout_seconds = 30
+cors_enabled = true
+cors_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+[database]
+url = "sqlite://uaida.db"
+max_connections = 10
+connection_timeout_seconds = 30
+auto_migrate = true
+
+[ai_engine]
+default_model = "qwen2.5-coder:7b-instruct"
+max_context_length = 4096
+temperature = 0.1
+top_p = 0.9
+max_tokens = 2048
+
+[providers]
+# Provider routing policy: "local_first", "quality_first", "cost_first", "speed_first"
+policy = "local_first"
+health_check_interval_seconds = 60
+circuit_breaker_threshold = 5
+circuit_breaker_timeout_seconds = 300
+
+[providers.ollama]
+enabled = true
+base_url = "http://localhost:11434"
+model = "qwen2.5-coder:7b-instruct"
+timeout_seconds = 60
+max_retries = 3
+
+[providers.openai]
+enabled = false
+api_key = "${OPENAI_API_KEY}"
+model = "gpt-4"
+timeout_seconds = 30
+max_retries = 3
+
+[providers.anthropic]
+enabled = false
+api_key = "${ANTHROPIC_API_KEY}"
+model = "claude-3-sonnet-20240229"
+timeout_seconds = 30
+max_retries = 3
+
+[providers.heuristic]
+enabled = true
+# Fallback provider - always enabled
+confidence_threshold = 0.3
+
+[context]
+# Context selection weights
+mmr_weight = 0.4
+recency_weight = 0.3
+centrality_weight = 0.3
+max_files = 50
+max_tokens_per_file = 2000
+embedding_model = "all-MiniLM-L6-v2"
+
+[sandbox]
+enabled = true
+docker_enabled = true
+timeout_seconds = 300
+max_memory_mb = 512
+max_cpu_percent = 50
+temp_dir = "/tmp/uaida"
+allowed_languages = ["python", "javascript", "typescript", "rust", "go"]
+
+[sandbox.python]
+image = "python:3.11-slim"
+packages = ["pytest", "black", "flake8", "mypy"]
+
+[sandbox.javascript]
+image = "node:18-alpine"
+packages = ["jest", "@types/jest", "eslint", "prettier"]
+
+[sandbox.rust]
+image = "rust:1.70-slim"
+packages = ["cargo-test", "clippy"]
+
+[agents]
+max_concurrent = 3
+default_timeout_seconds = 300
+budget_limit_usd = 1.0
+
+[agents.planner]
+enabled = true
+max_steps = 10
+complexity_threshold = 0.8
+
+[agents.retriever]
+enabled = true
+max_context_files = 20
+similarity_threshold = 0.7
+
+[agents.codegen]
+enabled = true
+max_iterations = 3
+quality_threshold = 0.8
+
+[agents.testgen]
+enabled = true
+coverage_target = 0.8
+test_frameworks = ["pytest", "jest", "cargo test"]
+
+[agents.reviewer]
+enabled = true
+quality_threshold = 7.0
+max_issues_per_file = 10
+
+[agents.risk]
+enabled = true
+risk_threshold = 0.7
+auto_approve_threshold = 0.2
+critical_files = ["main.rs", "lib.rs", "index.js", "app.py"]
+
+[observability]
+metrics_enabled = true
+tracing_enabled = true
+log_level = "info"
+prometheus_port = 9090
+
+[observability.metrics]
+# Prometheus metrics configuration
+namespace = "uaida"
+subsystem = "backend"
+buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+
+[observability.tracing]
+# OpenTelemetry configuration
+service_name = "uaida-backend"
+service_version = "1.0.0"
+jaeger_endpoint = "http://localhost:14268/api/traces"
+sample_rate = 1.0
+
+[security]
+rate_limiting_enabled = true
+max_requests_per_minute = 100
+max_requests_per_hour = 1000
+cors_max_age_seconds = 3600
+content_security_policy = "default-src 'self'"
+
+[security.headers]
+x_content_type_options = "nosniff"
+x_frame_options = "DENY"
+referrer_policy = "no-referrer"
+x_xss_protection = "1; mode=block"
+
+[feature]
+# Experimental features - default: off
+experimental = []
+# Available experimental features:
+# - "emotional_ai": AI responses with emotional context
+# - "musical": Code generation with musical patterns
+# - "quantum": Quantum computing code assistance
+# - "blockchain": Blockchain development tools
+# - "advanced_reasoning": Multi-step reasoning chains
+# - "code_evolution": Evolutionary code optimization
+# - "pair_programming": Real-time collaborative coding
+# - "auto_documentation": Automatic documentation generation
+
+[feature.stable]
+# Stable features - always enabled
+plan_generation = true
+patch_application = true
+test_execution = true
+code_review = true
+risk_assessment = true
+rollback_support = true
+metrics_collection = true
+tracing_support = true
+
+[feature.beta]
+# Beta features - enabled by default but may have issues
+vs_code_integration = true
+real_time_collaboration = true
+advanced_context_selection = true
+multi_language_support = true
+performance_optimization = true
+
+[cache]
+enabled = true
+ttl_seconds = 3600
+max_size_mb = 100
+redis_url = "redis://localhost:6379"
+
+[cache.embeddings]
+enabled = true
+ttl_seconds = 86400  # 24 hours
+max_entries = 10000
+
+[cache.completions]
+enabled = true
+ttl_seconds = 1800   # 30 minutes
+max_entries = 1000
+
+[evaluation]
+enabled = true
+output_dir = "docs/evals"
+auto_publish = true
+suites = ["humaneval", "swebench_lite"]
+
+[evaluation.humaneval]
+subset = "tiny"
+timeout_seconds = 60
+max_problems = 10
+
+[evaluation.swebench]
+mode = "lite"
+timeout_seconds = 300
+max_problems = 5
+
+[deployment]
+environment = "development"  # development, staging, production
+health_check_path = "/health"
+metrics_path = "/metrics"
+docs_path = "/docs"
+version = "1.0.0"
+
+[deployment.production]
+# Production-specific overrides
+log_level = "warn"
+debug = false
+cors_enabled = false
+rate_limiting_enabled = true
+auto_migrate = false
+
+[deployment.development]
+# Development-specific overrides
+log_level = "debug"
+debug = true
+cors_enabled = true
+auto_migrate = true
+hot_reload = true

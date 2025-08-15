@@ -1,0 +1,66 @@
+# P0 Task #7: Production Configuration Override
+# Universal AI Development Assistant - Production Environment
+
+[server]
+host = "0.0.0.0"
+port = 8080
+workers = 8
+max_connections = 5000
+request_timeout_seconds = 60
+
+[database]
+url = "${DATABASE_URL}"
+max_connections = 50
+connection_timeout_seconds = 10
+auto_migrate = false
+
+[ai_engine]
+temperature = 0.05  # More deterministic in production
+
+[providers]
+policy = "quality_first"
+health_check_interval_seconds = 30
+
+[providers.openai]
+enabled = true
+api_key = "${OPENAI_API_KEY}"
+
+[providers.anthropic]
+enabled = true
+api_key = "${ANTHROPIC_API_KEY}"
+
+[context]
+max_files = 100
+max_tokens_per_file = 4000
+
+[sandbox]
+max_memory_mb = 1024
+max_cpu_percent = 80
+timeout_seconds = 600
+
+[agents]
+max_concurrent = 6
+budget_limit_usd = 5.0
+
+[observability]
+log_level = "warn"
+prometheus_port = 9090
+
+[observability.tracing]
+sample_rate = 0.1  # Sample 10% in production
+
+[security]
+rate_limiting_enabled = true
+max_requests_per_minute = 200
+max_requests_per_hour = 5000
+
+[feature]
+experimental = []  # No experimental features in production
+
+[cache]
+max_size_mb = 500
+redis_url = "${REDIS_URL}"
+
+[deployment]
+environment = "production"
+debug = false

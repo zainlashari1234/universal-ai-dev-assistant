@@ -1,74 +1,143 @@
 version: '3.8'
 
 services:
-  backend:
+  # UAIDA Backend Service
+  uaida-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: uaida-backend
     ports:
       - "8080:8080"
     environment:
       - RUST_LOG=info
-      - UAIDA_CONFIG=/app/config.toml
-    volumes:
-      - ./data:/app/data
-      - ./models:/app/models
-      - ./config.toml:/app/config.toml
+      - UAIDA_HOST=0.0.0.0
+      - UAIDA_PORT=8080
+      - UAIDA_DATABASE_URL=postgresql://uaida:uaida_password@postgres:5432/uaida
+      - UAIDA_REDIS_URL=redis://redis:6379
+      - UAIDA_METRICS_ENABLED=true
+      - UAIDA_SANDBOX_ENABLED=true
     depends_on:
-      - database
+      - postgres
+      - redis
+    volumes:
+      - ./backend/temp:/app/temp
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - uaida-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
-    restart: unless-stopped
-
-  database:
+  # PostgreSQL Database
+  postgres:
     image: postgres:15-alpine
+    container_name: uaida-postgres
     environment:
-      POSTGRES_DB: uaida
-      POSTGRES_USER: uaida
-      POSTGRES_PASSWORD: uaida_password
+      - POSTGRES_DB=uaida
+      - POSTGRES_USER=uaida
+      - POSTGRES_PASSWORD=uaida_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/migrations:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - uaida-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uaida"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Optional: Redis for caching
+  # Redis Cache
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    container_name: uaida-redis
+    command: redis-server --appendonly yes --requirepass uaida_redis_password
     volumes:
       - redis_data:/data
+    networks:
+      - uaida-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: uaida-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - uaida-network
     restart: unless-stopped
 
-  # Optional: Nginx reverse proxy
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: uaida-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=uaida_admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - uaida-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
+    container_name: uaida-nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./ssl:/etc/nginx/ssl
-    depends_on:
-      - frontend
-      - backend
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./infra/nginx/ssl:/etc/nginx/ssl
+    networks:
+      - uaida-network
     restart: unless-stopped
+    depends_on:
+      - uaida-backend
+      - grafana
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  uaida-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

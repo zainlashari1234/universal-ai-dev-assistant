@@ -20,11 +20,14 @@ pub mod code_smell_detector;
 pub mod intelligent_autocomplete;
 pub mod code_time_travel;
 pub mod ai_pair_programming;
+pub mod providers;
 
 use model_manager::ModelManager;
+use providers::{ProviderRouter, ProviderConfig, ProviderType, RoutingPolicy};
 
 pub struct AIEngine {
     model_manager: Arc<RwLock<ModelManager>>,
+    provider_router: Arc<ProviderRouter>,
     config: Arc<Config>,
 }
 
@@ -34,53 +37,96 @@ impl AIEngine {
         
         let model_manager = ModelManager::new(config).await?;
         
+        // Initialize Provider Router with default configs
+        let provider_configs = vec![
+            ProviderConfig {
+                provider_type: ProviderType::Ollama,
+                endpoint: Some("http://localhost:11434".to_string()),
+                model: Some("qwen2.5-coder:7b".to_string()),
+                timeout_ms: 30000,
+                max_retries: 3,
+            },
+            ProviderConfig {
+                provider_type: ProviderType::Heuristic,
+                endpoint: None,
+                model: None,
+                timeout_ms: 1000,
+                max_retries: 1,
+            },
+        ];
+        
+        let routing_policy = RoutingPolicy::default();
+        let provider_router = ProviderRouter::new(provider_configs, routing_policy).await?;
+        
+        info!("AI Engine initialized with Provider Router");
+        
         Ok(Self {
             model_manager: Arc::new(RwLock::new(model_manager)),
+            provider_router: Arc::new(provider_router),
             config: Arc::new(config.clone()),
         })
     }
 
     pub async fn is_model_loaded(&self) -> bool {
+        // Check if either the model manager or provider router is available
         let manager = self.model_manager.read().await;
-        manager.is_loaded()
+        let model_loaded = manager.is_loaded();
+        
+        // Also check provider router health
+        match self.provider_router.health().await {
+            Ok(health) => model_loaded || health.is_available,
+            Err(_) => model_loaded,
+        }
     }
 
     pub async fn complete_code(&self, request: &CompletionRequest) -> Result<Vec<String>> {
-        let manager = self.model_manager.read().await;
-        
-        if !manager.is_loaded() {
-            return Err(anyhow!("AI model not loaded"));
-        }
-
         // Extract context around cursor position
         let context = self.extract_context(request)?;
         
-        // Generate completion prompt
+        // Build completion prompt
         let prompt = self.build_completion_prompt(&context, &request.language)?;
         
-        // Get AI completion
-        let completions = manager.generate_completion(&prompt).await?;
-        
-        // Post-process completions
-        let filtered_completions = self.filter_completions(completions, request)?;
-        
-        Ok(filtered_completions)
+        // Use Provider Router for completion (with fallback support)
+        match self.provider_router.complete(&prompt, Some(&request.language)).await {
+            Ok(completions) => {
+                // Post-process completions
+                let filtered_completions = self.filter_completions(completions, request)?;
+                Ok(filtered_completions)
+            }
+            Err(e) => {
+                warn!("Provider router completion failed, trying model manager: {}", e);
+                
+                // Fallback to original model manager if provider router fails
+                let manager = self.model_manager.read().await;
+                if manager.is_loaded() {
+                    let completions = manager.generate_completion(&prompt).await?;
+                    let filtered_completions = self.filter_completions(completions, request)?;
+                    Ok(filtered_completions)
+                } else {
+                    Err(anyhow!("All completion methods failed: {}", e))
+                }
+            }
+        }
     }
 
     pub async fn analyze_code(&self, request: &CompletionRequest) -> Result<Value> {
-        let manager = self.model_manager.read().await;
-        
-        if !manager.is_loaded() {
-            return Err(anyhow!("AI model not loaded"));
+        // Use Provider Router for analysis (with fallback support)
+        match self.provider_router.analyze(&request.code, &request.language).await {
+            Ok(analysis) => Ok(analysis),
+            Err(e) => {
+                warn!("Provider router analysis failed, trying model manager: {}", e);
+                
+                // Fallback to original model manager if provider router fails
+                let manager = self.model_manager.read().await;
+                if manager.is_loaded() {
+                    let prompt = self.build_analysis_prompt(&request.code, &request.language)?;
+                    let analysis = manager.generate_analysis(&prompt).await?;
+                    Ok(analysis)
+                } else {
+                    Err(anyhow!("All analysis methods failed: {}", e))
+                }
+            }
         }
-
-        // Build analysis prompt
-        let prompt = self.build_analysis_prompt(&request.code, &request.language)?;
-        
-        // Get AI analysis
-        let analysis = manager.generate_analysis(&prompt).await?;
-        
-        Ok(analysis)
     }
 
     fn extract_context(&self, request: &CompletionRequest) -> Result<String> {
