@@ -1,12 +1,12 @@
 [package]
 name = "universal-ai-dev-assistant"
-version = "0.1.0"
+version = "6.2.0"
 edition = "2021"
 authors = ["Universal AI Team <team@universalai.dev>"]
-description = "Privacy-focused, local AI-powered development assistant"
+description = "Advanced AI-powered development assistant with multiple provider support"
 license = "MIT"
 repository = "https://github.com/Tehlikeli107/universal-ai-dev-assistant"
-keywords = ["ai", "development", "assistant", "code", "completion"]
+keywords = ["ai", "development", "assistant", "code", "completion", "openrouter"]
 categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
@@ -14,19 +14,44 @@ categories = ["development-tools", "command-line-utilities"]
 tokio = { version = "1.0", features = ["full"] }
 axum = "0.7"
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "fs"] }
+tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+# HTTP client for API calls
+reqwest = { version = "0.11", features = ["json", "stream"] }
+
+# Configuration and environment
+config = "0.14"
+dotenvy = "0.15"
 
 # Utilities
 anyhow = "1.0"
 thiserror = "1.0"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 clap = { version = "4.0", features = ["derive"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Database (for caching and analytics)
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+
+# Security and rate limiting
+jsonwebtoken = "9.2"
+# tower_governor = "0.1"
+
+# Async utilities
+async-trait = "0.1"
+futures = "0.3"
+
+# Text processing
+regex = "1.10"
+tiktoken-rs = "0.5"
 
 [dev-dependencies]
 tempfile = "3.8"
+tokio-test = "0.4"
 
 [profile.release]
 lto = true
