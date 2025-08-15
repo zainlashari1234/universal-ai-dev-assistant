@@ -1,38 +1,30 @@
 [package]
-name = "uaida-cli"
+name = "uaida-ide"
 version = "6.2.0"
 edition = "2021"
 authors = ["Universal AI Team <team@universalai.dev>"]
-description = "Command-line interface for Universal AI Development Assistant"
+description = "Standalone IDE for Universal AI Development Assistant"
 license = "MIT"
 repository = "https://github.com/Tehlikeli107/universal-ai-dev-assistant"
 
 [[bin]]
-name = "uaida"
+name = "uaida-ide"
 path = "src/main.rs"
 
 [dependencies]
-# CLI framework
-clap = { version = "4.0", features = ["derive", "color"] }
-dialoguer = "0.11"
-indicatif = "0.17"
-console = "0.15"
-colored = "2.0"
+# GUI framework
+tauri = { version = "1.5", features = ["api-all"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 # HTTP client
 reqwest = { version = "0.11", features = ["json"] }
-
-# Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-toml = "0.8"
 
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
 
 # Utilities
 anyhow = "1.0"
-dirs = "5.0"
 uuid = { version = "1.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 
@@ -41,13 +33,12 @@ walkdir = "2.3"
 ignore = "0.4"
 
 # Configuration
-config = "0.14"
-dotenvy = "0.15"
-
-# Terminal UI
-crossterm = "0.27"
-ratatui = "0.24"
+dirs = "5.0"
+toml = "0.8"
 
 # Text processing
 regex = "1.10"
 syntect = "5.1"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }

@@ -1,190 +1,340 @@
-use clap::{Parser, Subcommand};
-use anyhow::Result;
-use colored::*;
-use std::path::PathBuf;
-
 mod commands;
 mod config;
+mod ui;
 mod client;
 
-use commands::*;
-use config::CliConfig;
+use clap::{Parser, Subcommand};
+use colored::*;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "uaida")]
 #[command(about = "Universal AI Development Assistant CLI")]
-#[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(version = "6.2.0")]
+#[command(author = "Universal AI Team")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-    
-    #[arg(long, global = true)]
+
+    /// Configuration file path
+    #[arg(short, long)]
     config: Option<PathBuf>,
-    
-    #[arg(long, global = true)]
-    server: Option<String>,
-    
-    #[arg(long, global = true)]
+
+    /// Server URL
+    #[arg(short, long, default_value = "http://localhost:8080")]
+    server: String,
+
+    /// Verbose output
+    #[arg(short, long)]
     verbose: bool,
+
+    /// Output format (json, yaml, table)
+    #[arg(short, long, default_value = "table")]
+    output: String,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Initialize UAIDA in current directory
+    /// Initialize UAIDA configuration
     Init {
-        #[arg(long)]
+        /// Force overwrite existing config
+        #[arg(short, long)]
         force: bool,
     },
-    /// Get AI code completion
+    
+    /// Start interactive development environment
+    Dev {
+        /// Project directory
+        #[arg(short, long, default_value = ".")]
+        project: PathBuf,
+        
+        /// Language hint
+        #[arg(short, long)]
+        language: Option<String>,
+    },
+    
+    /// Code completion
     Complete {
+        /// Code prompt
+        prompt: String,
+        
+        /// Programming language
+        #[arg(short, long)]
+        language: Option<String>,
+        
+        /// AI model to use
+        #[arg(short, long)]
+        model: Option<String>,
+        
+        /// AI provider to use
+        #[arg(short, long)]
+        provider: Option<String>,
+        
+        /// Max tokens
+        #[arg(long, default_value = "1000")]
+        max_tokens: u32,
+        
+        /// Temperature (0.0-1.0)
+        #[arg(long, default_value = "0.7")]
+        temperature: f32,
+    },
+    
+    /// Analyze code
+    Analyze {
         /// File to analyze
         file: PathBuf,
-        /// Line number (1-based)
+        
+        /// Analysis type (security, performance, quality, bugs)
+        #[arg(short, long, default_value = "quality")]
+        analysis_type: String,
+        
+        /// Programming language (auto-detect if not specified)
         #[arg(short, long)]
-        line: Option<usize>,
-        /// Column number (1-based)
-        #[arg(short, long)]
-        column: Option<usize>,
+        language: Option<String>,
     },
-    /// Analyze code for issues and improvements
-    Analyze {
-        /// File or directory to analyze
-        path: PathBuf,
-        /// Output format (text, json, sarif)
-        #[arg(short, long, default_value = "text")]
-        format: String,
-        /// Include security scan
-        #[arg(long)]
-        security: bool,
-    },
+    
     /// Generate documentation
-    Docs {
-        /// File or directory to document
-        path: PathBuf,
-        /// Output file
+    Doc {
+        /// File to document
+        file: PathBuf,
+        
+        /// Output file (stdout if not specified)
         #[arg(short, long)]
         output: Option<PathBuf>,
-        /// Documentation format (markdown, html)
+        
+        /// Documentation format (markdown, rst, html)
         #[arg(short, long, default_value = "markdown")]
         format: String,
     },
+    
     /// Generate tests
     Test {
         /// File to generate tests for
         file: PathBuf,
-        /// Test framework (pytest, jest, etc.)
-        #[arg(short, long)]
-        framework: Option<String>,
-        /// Output directory
+        
+        /// Output file (auto-generate if not specified)
         #[arg(short, long)]
         output: Option<PathBuf>,
+        
+        /// Test framework
+        #[arg(short, long)]
+        framework: Option<String>,
     },
+    
+    /// Explain code
+    Explain {
+        /// File to explain
+        file: PathBuf,
+        
+        /// Specific function/class to explain
+        #[arg(short, long)]
+        symbol: Option<String>,
+    },
+    
     /// Refactor code
     Refactor {
         /// File to refactor
         file: PathBuf,
-        /// Refactoring type
+        
+        /// Refactoring instructions
+        instructions: String,
+        
+        /// Output file (overwrite original if not specified)
         #[arg(short, long)]
-        refactor_type: Option<String>,
-        /// Apply changes automatically
-        #[arg(long)]
-        apply: bool,
-    },
-    /// Start local AI server
-    Server {
-        /// Port to bind to
-        #[arg(short, long, default_value = "8080")]
-        port: u16,
-        /// Host to bind to
-        #[arg(long, default_value = "127.0.0.1")]
-        host: String,
-        /// Run in background
+        output: Option<PathBuf>,
+        
+        /// Create backup
         #[arg(short, long)]
-        daemon: bool,
+        backup: bool,
     },
-    /// Check server status
+    
+    /// Translate code between languages
+    Translate {
+        /// Source file
+        file: PathBuf,
+        
+        /// Target language
+        #[arg(short, long)]
+        to: String,
+        
+        /// Source language (auto-detect if not specified)
+        #[arg(short, long)]
+        from: Option<String>,
+        
+        /// Output file
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+    
+    /// Chat with AI assistant
+    Chat {
+        /// Initial message
+        message: Option<String>,
+        
+        /// AI model to use
+        #[arg(short, long)]
+        model: Option<String>,
+        
+        /// AI provider to use
+        #[arg(short, long)]
+        provider: Option<String>,
+    },
+    
+    /// Manage AI providers
+    Providers {
+        #[command(subcommand)]
+        action: ProviderCommands,
+    },
+    
+    /// Show system status
     Status,
-    /// Configure UAIDA settings
+    
+    /// Show configuration
     Config {
         #[command(subcommand)]
-        action: ConfigAction,
+        action: Option<ConfigCommands>,
     },
 }
 
 #[derive(Subcommand)]
-enum ConfigAction {
+enum ProviderCommands {
+    /// List available providers
+    List,
+    
+    /// Test provider connectivity
+    Test {
+        /// Provider name
+        provider: Option<String>,
+    },
+    
+    /// Show provider metrics
+    Metrics {
+        /// Provider name
+        provider: Option<String>,
+    },
+    
+    /// Configure provider
+    Configure {
+        /// Provider name
+        provider: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfigCommands {
     /// Show current configuration
     Show,
+    
     /// Set configuration value
     Set {
+        /// Configuration key
         key: String,
+        
+        /// Configuration value
         value: String,
     },
+    
     /// Get configuration value
     Get {
+        /// Configuration key
         key: String,
     },
-    /// Reset to default configuration
+    
+    /// Reset configuration to defaults
     Reset,
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     
-    // Initialize logging
-    if cli.verbose {
-        env_logger::init();
+    // Initialize configuration
+    let config = config::Config::load(cli.config.as_deref())?;
+    
+    // Initialize client
+    let client = client::Client::new(&cli.server, &config)?;
+    
+    // Print banner
+    if !matches!(cli.command, Commands::Chat { .. }) {
+        print_banner();
     }
-
-    // Load configuration
-    let config = CliConfig::load(cli.config.as_deref())?;
     
-    // Override server URL if provided
-    let server_url = cli.server.unwrap_or(config.server_url.clone());
-    
+    // Execute command
     match cli.command {
         Commands::Init { force } => {
-            init_command(force).await
+            commands::init::run(force).await?;
         }
-        Commands::Complete { file, line, column } => {
-            complete_command(&server_url, file, line, column).await
+        
+        Commands::Dev { project, language } => {
+            commands::dev::run(project, language, &client).await?;
         }
-        Commands::Analyze { path, format, security } => {
-            analyze_command(&server_url, path, &format, security).await
+        
+        Commands::Complete { 
+            prompt, 
+            language, 
+            model, 
+            provider, 
+            max_tokens, 
+            temperature 
+        } => {
+            commands::complete::run(
+                prompt, 
+                language, 
+                model, 
+                provider, 
+                max_tokens, 
+                temperature, 
+                &client
+            ).await?;
         }
-        Commands::Docs { path, output, format } => {
-            docs_command(&server_url, path, output, &format).await
+        
+        Commands::Analyze { file, analysis_type, language } => {
+            commands::analyze::run(file, analysis_type, language, &client).await?;
         }
-        Commands::Test { file, framework, output } => {
-            test_command(&server_url, file, framework, output).await
+        
+        Commands::Doc { file, output, format } => {
+            commands::doc::run(file, output, format, &client).await?;
         }
-        Commands::Refactor { file, refactor_type, apply } => {
-            refactor_command(&server_url, file, refactor_type, apply).await
+        
+        Commands::Test { file, output, framework } => {
+            commands::test::run(file, output, framework, &client).await?;
         }
-        Commands::Server { port, host, daemon } => {
-            server_command(port, &host, daemon).await
+        
+        Commands::Explain { file, symbol } => {
+            commands::explain::run(file, symbol, &client).await?;
         }
+        
+        Commands::Refactor { file, instructions, output, backup } => {
+            commands::refactor::run(file, instructions, output, backup, &client).await?;
+        }
+        
+        Commands::Translate { file, to, from, output } => {
+            commands::translate::run(file, to, from, output, &client).await?;
+        }
+        
+        Commands::Chat { message, model, provider } => {
+            commands::chat::run(message, model, provider, &client).await?;
+        }
+        
+        Commands::Providers { action } => {
+            commands::providers::run(action, &client).await?;
+        }
+        
         Commands::Status => {
-            status_command(&server_url).await
+            commands::status::run(&client).await?;
         }
+        
         Commands::Config { action } => {
-            config_command(action, &config).await
+            commands::config::run(action, &config).await?;
         }
     }
+    
+    Ok(())
 }
 
 fn print_banner() {
-    println!("{}", "
-    ██╗   ██╗ █████╗ ██╗██████╗  █████╗ 
-    ██║   ██║██╔══██╗██║██╔══██╗██╔══██╗
-    ██║   ██║███████║██║██║  ██║███████║
-    ██║   ██║██╔══██║██║██║  ██║██╔══██║
-    ╚██████╔╝██║  ██║██║██████╔╝██║  ██║
-     ╚═════╝ ╚═╝  ╚═╝╚═╝╚═════╝ ╚═╝  ╚═╝
-    ".bright_blue());
-    
-    println!("{}", "Universal AI Development Assistant".bright_green());
-    println!("{}", format!("Version {}", env!("CARGO_PKG_VERSION")).dimmed());
+    println!("{}", "🚀 Universal AI Development Assistant".bright_blue().bold());
+    println!("{}", "   Next-Generation AI-Powered Development Platform".bright_white());
+    println!("{}", "   Version 6.2.0 - Multi-Provider AI Integration".bright_green());
     println!();
 }

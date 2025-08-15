@@ -1,58 +1,168 @@
 {
   "name": "uaida-vscode",
   "displayName": "Universal AI Development Assistant",
-  "description": "AI-powered development assistant with autonomous PRs",
-  "version": "1.0.0",
-  "publisher": "uaida",
+  "description": "Next-generation AI-powered development assistant with multi-provider support",
+  "version": "6.2.0",
+  "publisher": "universal-ai-team",
   "engines": {
     "vscode": "^1.74.0"
   },
   "categories": [
     "Other",
     "Machine Learning",
-    "Programming Languages"
+    "Programming Languages",
+    "Snippets",
+    "Formatters"
   ],
   "keywords": [
     "ai",
     "assistant",
     "code-generation",
+    "completion",
+    "analysis",
+    "documentation",
     "testing",
-    "automation"
+    "refactoring",
+    "openai",
+    "anthropic",
+    "openrouter"
   ],
   "activationEvents": [
-    "onCommand:uaida.plan",
-    "onCommand:uaida.patch",
-    "onCommand:uaida.test",
-    "onCommand:uaida.review",
-    "onCommand:uaida.rollback"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "uaida.plan",
-        "title": "UAIDA: Create Plan",
-        "icon": "$(lightbulb)"
+        "command": "uaida.complete",
+        "title": "Complete Code",
+        "category": "UAIDA"
       },
       {
-        "command": "uaida.patch",
-        "title": "UAIDA: Apply Patch",
-        "icon": "$(git-commit)"
+        "command": "uaida.analyze",
+        "title": "Analyze Code",
+        "category": "UAIDA"
+      },
+      {
+        "command": "uaida.explain",
+        "title": "Explain Code",
+        "category": "UAIDA"
+      },
+      {
+        "command": "uaida.document",
+        "title": "Generate Documentation",
+        "category": "UAIDA"
       },
       {
         "command": "uaida.test",
-        "title": "UAIDA: Run Tests",
-        "icon": "$(beaker)"
+        "title": "Generate Tests",
+        "category": "UAIDA"
       },
       {
-        "command": "uaida.review",
-        "title": "UAIDA: Code Review",
-        "icon": "$(checklist)"
+        "command": "uaida.refactor",
+        "title": "Refactor Code",
+        "category": "UAIDA"
       },
       {
-        "command": "uaida.rollback",
-        "title": "UAIDA: Rollback",
-        "icon": "$(discard)"
+        "command": "uaida.translate",
+        "title": "Translate Code",
+        "category": "UAIDA"
+      },
+      {
+        "command": "uaida.chat",
+        "title": "Open AI Chat",
+        "category": "UAIDA"
+      },
+      {
+        "command": "uaida.status",
+        "title": "Show Status",
+        "category": "UAIDA"
+      },
+      {
+        "command": "uaida.configure",
+        "title": "Configure Providers",
+        "category": "UAIDA"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "submenu": "uaida.submenu",
+          "group": "1_modification@1"
+        }
+      ],
+      "uaida.submenu": [
+        {
+          "command": "uaida.complete",
+          "when": "editorHasSelection || editorTextFocus",
+          "group": "1_generate@1"
+        },
+        {
+          "command": "uaida.explain",
+          "when": "editorHasSelection",
+          "group": "1_generate@2"
+        },
+        {
+          "command": "uaida.document",
+          "when": "editorHasSelection",
+          "group": "1_generate@3"
+        },
+        {
+          "command": "uaida.test",
+          "when": "editorHasSelection",
+          "group": "1_generate@4"
+        },
+        {
+          "command": "uaida.refactor",
+          "when": "editorHasSelection",
+          "group": "2_modify@1"
+        },
+        {
+          "command": "uaida.translate",
+          "when": "editorHasSelection",
+          "group": "2_modify@2"
+        },
+        {
+          "command": "uaida.analyze",
+          "when": "editorHasSelection || editorTextFocus",
+          "group": "3_analyze@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "uaida.complete",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "uaida.analyze",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "uaida.explain",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "uaida.document",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "uaida.test",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "uaida.refactor",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "uaida.translate",
+          "when": "editorIsOpen"
+        }
+      ]
+    },
+    "submenus": [
+      {
+        "id": "uaida.submenu",
+        "label": "UAIDA AI Assistant"
       }
     ],
     "configuration": {
@@ -63,13 +173,93 @@
           "default": "http://localhost:8080",
           "description": "UAIDA backend server URL"
         },
-        "uaida.autoApplyPatches": {
+        "uaida.enableAutoCompletion": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic code completion suggestions"
+        },
+        "uaida.defaultProvider": {
+          "type": "string",
+          "enum": ["auto", "openrouter", "openai", "anthropic", "google", "groq", "ollama"],
+          "default": "auto",
+          "description": "Default AI provider to use"
+        },
+        "uaida.defaultModel": {
+          "type": "string",
+          "default": "",
+          "description": "Default AI model to use (leave empty for provider default)"
+        },
+        "uaida.maxTokens": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 1,
+          "maximum": 4000,
+          "description": "Maximum tokens for AI responses"
+        },
+        "uaida.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "AI response creativity (0.0 = deterministic, 1.0 = creative)"
+        },
+        "uaida.showProgress": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show progress indicators for AI requests"
+        },
+        "uaida.enableDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable real-time code analysis and diagnostics"
+        },
+        "uaida.autoSave": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically apply patches without confirmation"
+          "description": "Automatically save generated code"
+        },
+        "uaida.createBackups": {
+          "type": "boolean",
+          "default": true,
+          "description": "Create backups before modifying files"
         }
       }
-    }
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "uaidaExplorer",
+          "name": "UAIDA Assistant",
+          "when": "workspaceHasFolder"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "uaida",
+          "title": "UAIDA",
+          "icon": "$(robot)"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "uaida.complete",
+        "key": "ctrl+shift+space",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "uaida.explain",
+        "key": "ctrl+shift+e",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "uaida.chat",
+        "key": "ctrl+shift+c",
+        "when": "editorTextFocus"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -77,15 +267,19 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "echo 'No tests configured'",
-    "package": "echo 'Package command placeholder'"
+    "test": "echo 'Tests not configured yet'",
+    "package": "vsce package"
   },
   "devDependencies": {
-    "@types/node": "16.x",
     "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
     "@typescript-eslint/eslint-plugin": "^5.45.0",
     "@typescript-eslint/parser": "^5.45.0",
     "eslint": "^8.28.0",
-    "typescript": "^4.9.4"
+    "typescript": "^4.9.4",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
   }
 }

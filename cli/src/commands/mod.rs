@@ -1,0 +1,13 @@
+pub mod init;
+pub mod dev;
+pub mod complete;
+pub mod analyze;
+pub mod doc;
+pub mod test;
+pub mod explain;
+pub mod refactor;
+pub mod translate;
+pub mod chat;
+pub mod providers;
+pub mod status;
+pub mod config;
