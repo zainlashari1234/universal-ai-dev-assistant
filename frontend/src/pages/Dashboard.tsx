@@ -25,7 +25,7 @@ interface Stats {
 
 export const Dashboard: React.FC = () => {
   const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
-  const [stats, setStats] = useState<Stats>({
+  const [stats] = useState<Stats>({
     totalCompletions: 1234,
     avgResponseTime: 85,
     successRate: 97.5,
