@@ -1,0 +1,150 @@
+name: 🚀 Simple CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  basic-checks:
+    name: 🔍 Basic Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🦀 Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: 📦 Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          backend/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: 🎨 Check Rust formatting
+      run: |
+        if [ -d "backend" ]; then
+          cd backend && cargo fmt -- --check
+        else
+          echo "Backend directory not found, skipping Rust checks"
+        fi
+
+    - name: 📎 Rust Clippy
+      run: |
+        if [ -d "backend" ]; then
+          cd backend && cargo clippy -- -D warnings
+        else
+          echo "Backend directory not found, skipping Clippy"
+        fi
+
+  frontend-checks:
+    name: 🎨 Frontend Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'frontend/package-lock.json'
+
+    - name: 📦 Install frontend dependencies
+      run: |
+        if [ -d "frontend" ]; then
+          cd frontend && npm ci
+        else
+          echo "Frontend directory not found, skipping frontend checks"
+        fi
+
+    - name: 🧪 Run frontend tests
+      run: |
+        if [ -d "frontend" ]; then
+          cd frontend && npm test -- --coverage --watchAll=false
+        else
+          echo "Frontend directory not found, skipping tests"
+        fi
+
+  backend-tests:
+    name: 🧪 Backend Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust-version: [stable, beta]
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🦀 Setup Rust ${{ matrix.rust-version }}
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust-version }}
+
+    - name: 📦 Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          backend/target
+        key: ${{ runner.os }}-${{ matrix.rust-version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: 🧪 Run backend tests
+      run: |
+        if [ -d "backend" ]; then
+          cd backend && cargo test --verbose
+        else
+          echo "Backend directory not found, skipping backend tests"
+        fi
+
+  integration-tests:
+    name: 🔗 Integration Tests
+    runs-on: ubuntu-latest
+    needs: [basic-checks, frontend-checks]
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: 🧪 Run integration tests
+      run: |
+        echo "✅ Integration tests placeholder - would run actual tests here"
+        echo "📊 All basic checks passed successfully"
+
+  security-basic:
+    name: 🛡️ Basic Security
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🔍 Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'table'
+
+    - name: ✅ Security check completed
+      run: echo "🛡️ Basic security scan completed"

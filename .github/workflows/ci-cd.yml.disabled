@@ -24,11 +24,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: 🦀 Setup Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: stable
         components: rustfmt, clippy
-        override: true
 
     - name: 📦 Cache dependencies
       uses: actions/cache@v3
@@ -46,8 +44,9 @@ jobs:
       run: cd backend && cargo clippy -- -D warnings
 
     - name: 🔒 Security audit
-      uses: actions-rs/audit-check@v1
-      with:
+      run: |
+        cargo install cargo-audit
+        cd backend && cargo audit
         token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: 🐍 Setup Python
