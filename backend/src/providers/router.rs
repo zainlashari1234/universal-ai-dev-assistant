@@ -97,7 +97,60 @@ impl ProviderRouter {
             Err(e) => warn!("Failed to initialize Ollama provider: {}", e),
         }
 
-        // TODO: Add other providers (Anthropic, Google, etc.)
+        // Initialize Together AI if configured
+        if config.providers.together.enabled {
+            match super::together::TogetherProvider::new(config.providers.together.clone()) {
+                Ok(provider) => {
+                    providers.insert("together".to_string(), Box::new(provider));
+                    info!("Together AI provider initialized");
+                }
+                Err(e) => warn!("Failed to initialize Together AI provider: {}", e),
+            }
+        }
+
+        // Initialize Cohere if configured
+        if config.providers.cohere.enabled {
+            match super::cohere::CohereProvider::new(config.providers.cohere.clone()) {
+                Ok(provider) => {
+                    providers.insert("cohere".to_string(), Box::new(provider));
+                    info!("Cohere provider initialized");
+                }
+                Err(e) => warn!("Failed to initialize Cohere provider: {}", e),
+            }
+        }
+
+        // Initialize Anthropic if configured
+        if config.providers.anthropic.enabled {
+            match super::anthropic::AnthropicProvider::new(config.providers.anthropic.clone()) {
+                Ok(provider) => {
+                    providers.insert("anthropic".to_string(), Box::new(provider));
+                    info!("Anthropic provider initialized");
+                }
+                Err(e) => warn!("Failed to initialize Anthropic provider: {}", e),
+            }
+        }
+
+        // Initialize Google if configured
+        if config.providers.google.enabled {
+            match super::google::GoogleProvider::new(config.providers.google.clone()) {
+                Ok(provider) => {
+                    providers.insert("google".to_string(), Box::new(provider));
+                    info!("Google provider initialized");
+                }
+                Err(e) => warn!("Failed to initialize Google provider: {}", e),
+            }
+        }
+
+        // Initialize Groq if configured
+        if config.providers.groq.enabled {
+            match super::groq::GroqProvider::new(config.providers.groq.clone()) {
+                Ok(provider) => {
+                    providers.insert("groq".to_string(), Box::new(provider));
+                    info!("Groq provider initialized");
+                }
+                Err(e) => warn!("Failed to initialize Groq provider: {}", e),
+            }
+        }
 
         let metrics = Arc::new(RwLock::new(HashMap::new()));
         let health_cache = Arc::new(RwLock::new(HashMap::new()));
