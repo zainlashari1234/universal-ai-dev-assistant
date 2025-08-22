@@ -1,41 +1,31 @@
 // Test setup for Universal AI Development Assistant Frontend
+// Simple setup without complex dependencies
 
-import { expect, afterEach } from 'vitest';
-import { cleanup } from '@testing-library/react';
-import * as matchers from '@testing-library/jest-dom/matchers';
-
-// Extend Vitest's expect with jest-dom matchers
-expect.extend(matchers);
-
-// Cleanup after each test case
-afterEach(() => {
-  cleanup();
-});
-
-// Mock UAIDAClient for tests
 export const mockUAIDAClient = {
-  getCompletion: vi.fn(),
-  analyzeCode: vi.fn(),
-  sendChatMessage: vi.fn(),
-  searchCode: vi.fn(),
-  getProviders: vi.fn(),
-  getHealth: vi.fn(),
+  getCompletion: () => Promise.resolve({ suggestions: [] }),
+  analyzeCode: () => Promise.resolve({ security_issues: [], performance_suggestions: [], code_quality: { score: 100, issues: [] } }),
+  sendChatMessage: () => Promise.resolve({ role: 'assistant', content: 'Test response', timestamp: new Date() }),
+  searchCode: () => Promise.resolve([]),
+  getProviders: () => Promise.resolve([]),
+  getHealth: () => Promise.resolve({ status: 'healthy', version: '1.0.0', uptime: 0 }),
 };
 
-// Global test utilities
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+// Basic test utilities
+if (typeof global !== 'undefined') {
+  (global as any).ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
 
-global.matchMedia = vi.fn().mockImplementation((query) => ({
-  matches: false,
-  media: query,
-  onchange: null,
-  addListener: vi.fn(),
-  removeListener: vi.fn(),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  dispatchEvent: vi.fn(),
-}));
+  (global as any).matchMedia = (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => {},
+  });
+}
