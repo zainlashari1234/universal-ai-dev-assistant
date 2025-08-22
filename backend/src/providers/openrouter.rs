@@ -119,6 +119,69 @@ impl OpenRouterProvider {
             metadata: None,
         })
     }
+
+    fn parse_analysis_findings(&self, content: &str, analysis_type: &super::traits::AnalysisType) -> Vec<String> {
+        let mut findings = Vec::new();
+        
+        // Simple pattern-based parsing - could be enhanced with more sophisticated NLP
+        let lines: Vec<&str> = content.lines().collect();
+        
+        for line in lines {
+            let line_lower = line.to_lowercase();
+            
+            match analysis_type {
+                super::traits::AnalysisType::Security => {
+                    if line_lower.contains("vulnerability") || line_lower.contains("security") || 
+                       line_lower.contains("injection") || line_lower.contains("xss") {
+                        findings.push(line.trim().to_string());
+                    }
+                }
+                super::traits::AnalysisType::Performance => {
+                    if line_lower.contains("performance") || line_lower.contains("optimization") || 
+                       line_lower.contains("slow") || line_lower.contains("memory") {
+                        findings.push(line.trim().to_string());
+                    }
+                }
+                super::traits::AnalysisType::Quality => {
+                    if line_lower.contains("quality") || line_lower.contains("best practice") || 
+                       line_lower.contains("maintainability") || line_lower.contains("readability") {
+                        findings.push(line.trim().to_string());
+                    }
+                }
+                super::traits::AnalysisType::Bugs => {
+                    if line_lower.contains("bug") || line_lower.contains("error") || 
+                       line_lower.contains("issue") || line_lower.contains("problem") {
+                        findings.push(line.trim().to_string());
+                    }
+                }
+                _ => {
+                    if line_lower.contains("finding") || line_lower.contains("issue") || 
+                       line_lower.contains("problem") || line_lower.contains("suggestion") {
+                        findings.push(line.trim().to_string());
+                    }
+                }
+            }
+        }
+        
+        findings
+    }
+
+    fn parse_analysis_suggestions(&self, content: &str) -> Vec<String> {
+        let mut suggestions = Vec::new();
+        let lines: Vec<&str> = content.lines().collect();
+        
+        for line in lines {
+            let line_lower = line.to_lowercase();
+            
+            if line_lower.contains("suggest") || line_lower.contains("recommend") || 
+               line_lower.contains("should") || line_lower.contains("consider") ||
+               line_lower.contains("improve") || line_lower.contains("fix") {
+                suggestions.push(line.trim().to_string());
+            }
+        }
+        
+        suggestions
+    }
 }
 
 #[async_trait]
@@ -223,12 +286,12 @@ impl AIProvider for OpenRouterProvider {
         // For now, return a simple analysis - this could be enhanced with structured parsing
         Ok(AnalysisResponse {
             analysis_type: request.analysis_type,
-            findings: vec![], // TODO: Parse findings from response
+            findings: self.parse_analysis_findings(&content, &request.analysis_type),
             summary: response.choices.first()
                 .map(|c| c.text.clone())
                 .unwrap_or_else(|| "No analysis available".to_string()),
             confidence_score: 0.8,
-            suggestions: vec![], // TODO: Parse suggestions from response
+            suggestions: self.parse_analysis_suggestions(&content),
         })
     }
 

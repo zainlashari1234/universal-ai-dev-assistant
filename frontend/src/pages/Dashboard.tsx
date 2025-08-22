@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   CheckCircleIcon, 
   XCircleIcon, 
   ClockIcon,
   ChartBarIcon,
   CodeBracketIcon,
-  CpuChipIcon
+  CpuChipIcon,
+  KeyIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import axios from 'axios';
 
 interface ServerStatus {
   status: string;
@@ -24,14 +28,16 @@ interface Stats {
 }
 
 export const Dashboard: React.FC = () => {
+  const { user } = useAuth();
   const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
-  const [stats] = useState<Stats>({
-    totalCompletions: 1234,
-    avgResponseTime: 85,
-    successRate: 97.5,
-    activeUsers: 42
+  const [stats, setStats] = useState<Stats>({
+    totalCompletions: 0,
+    avgResponseTime: 0,
+    successRate: 0,
+    activeUsers: 1
   });
   const [loading, setLoading] = useState(true);
+  const [apiKeyCount, setApiKeyCount] = useState(0);
 
   const performanceData = [
     { time: '00:00', responseTime: 120 },
@@ -43,16 +49,37 @@ export const Dashboard: React.FC = () => {
   ];
 
   useEffect(() => {
-    fetchServerStatus();
+    fetchDashboardData();
   }, []);
 
-  const fetchServerStatus = async () => {
+  const fetchDashboardData = async () => {
     try {
-      const response = await fetch('/health');
-      const data = await response.json();
-      setServerStatus(data);
+      // Fetch server health
+      const healthResponse = await axios.get('/health');
+      setServerStatus(healthResponse.data);
+
+      // Fetch user's API keys count
+      const apiKeysResponse = await axios.get('/api-keys');
+      setApiKeyCount(apiKeysResponse.data.api_keys?.length || 0);
+
+      // Fetch usage metrics
+      const metricsResponse = await axios.get('/metrics');
+      const metrics = metricsResponse.data.metrics || {};
+      
+      // Calculate stats from metrics
+      const totalRequests = Object.values(metrics).reduce((sum: number, m: any) => sum + (m.total_requests || 0), 0);
+      const avgResponseTime = Object.values(metrics).reduce((sum: number, m: any) => sum + (m.avg_response_time_ms || 0), 0) / Object.keys(metrics).length;
+      const successRate = Object.values(metrics).reduce((sum: number, m: any) => sum + (m.success_rate || 0), 0) / Object.keys(metrics).length * 100;
+
+      setStats({
+        totalCompletions: totalRequests,
+        avgResponseTime: avgResponseTime || 0,
+        successRate: successRate || 0,
+        activeUsers: 1
+      });
+
     } catch (error) {
-      console.error('Failed to fetch server status:', error);
+      console.error('Failed to fetch dashboard data:', error);
     } finally {
       setLoading(false);
     }

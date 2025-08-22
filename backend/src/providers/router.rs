@@ -259,13 +259,30 @@ impl ProviderRouter {
     }
 
     async fn select_by_cost(&self, available_providers: &[String]) -> Option<String> {
-        // For now, prioritize free providers (Ollama) then cheapest
+        // Prioritize free providers (Ollama) first
         if available_providers.contains(&"ollama".to_string()) {
             return Some("ollama".to_string());
         }
 
-        // TODO: Implement actual cost comparison based on model pricing
-        available_providers.first().cloned()
+        // Calculate cost for each provider and select cheapest
+        let mut provider_costs = Vec::new();
+        
+        for provider_name in available_providers {
+            let cost_per_1k_tokens = match provider_name.as_str() {
+                "openai" => 0.002,      // GPT-3.5-turbo approximate cost
+                "openrouter" => 0.0015, // Average OpenRouter cost
+                "anthropic" => 0.008,   // Claude approximate cost
+                "cohere" => 0.001,      // Cohere approximate cost
+                "together" => 0.0008,   // Together AI approximate cost
+                _ => 0.002,             // Default cost
+            };
+            
+            provider_costs.push((provider_name.clone(), cost_per_1k_tokens));
+        }
+        
+        // Sort by cost and return cheapest
+        provider_costs.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        provider_costs.first().map(|(name, _)| name.clone())
     }
 
     async fn select_by_performance(&self, available_providers: &[String]) -> Option<String> {
@@ -379,7 +396,7 @@ impl AIProvider for ProviderRouter {
         Ok(HealthCheck {
             is_available: !available_providers.is_empty(),
             response_time_ms: 0,
-            supported_models: vec![], // TODO: Aggregate from all providers
+            supported_models: self.get_all_supported_models().await,
             rate_limit_remaining: None,
             error_message: if available_providers.is_empty() {
                 Some("No providers available".to_string())

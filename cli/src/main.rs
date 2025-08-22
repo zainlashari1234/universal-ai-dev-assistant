@@ -150,98 +150,84 @@ enum Commands {
     
     /// Translate code between languages
     Translate {
-        /// Source file
+        /// File to translate
         file: PathBuf,
         
         /// Target language
         #[arg(short, long)]
-        to: String,
-        
-        /// Source language (auto-detect if not specified)
-        #[arg(short, long)]
-        from: Option<String>,
+        target: String,
         
         /// Output file
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
     
-    /// Chat with AI assistant
+    /// Interactive terminal mode
+    Terminal,
+    
+    /// Search code patterns
+    Search {
+        /// Search query
+        query: String,
+        
+        /// Directory to search
+        #[arg(short, long, default_value = ".")]
+        directory: PathBuf,
+        
+        /// File extensions to include
+        #[arg(short, long)]
+        extensions: Option<Vec<String>>,
+    },
+    
+    /// Fix code issues
+    Fix {
+        /// File to fix
+        file: PathBuf,
+        
+        /// Issue type (auto, security, performance, style)
+        #[arg(short, long, default_value = "auto")]
+        issue_type: String,
+        
+        /// Apply fixes automatically
+        #[arg(short, long)]
+        auto_apply: bool,
+    },
+    
+    /// Interactive chat mode
     Chat {
         /// Initial message
         message: Option<String>,
         
-        /// AI model to use
-        #[arg(short, long)]
-        model: Option<String>,
-        
-        /// AI provider to use
-        #[arg(short, long)]
-        provider: Option<String>,
+        /// Chat mode (code, general, debug)
+        #[arg(short, long, default_value = "code")]
+        mode: String,
     },
     
     /// Manage AI providers
     Providers {
-        #[command(subcommand)]
-        action: ProviderCommands,
+        /// Provider action (list, add, remove, test)
+        #[arg(short, long, default_value = "list")]
+        action: String,
+        
+        /// Provider name
+        #[arg(short, long)]
+        name: Option<String>,
+        
+        /// API key
+        #[arg(short, long)]
+        key: Option<String>,
     },
     
     /// Show system status
-    Status,
-    
-    /// Show configuration
-    Config {
-        #[command(subcommand)]
-        action: Option<ConfigCommands>,
-    },
-}
-
-#[derive(Subcommand)]
-enum ProviderCommands {
-    /// List available providers
-    List,
-    
-    /// Test provider connectivity
-    Test {
-        /// Provider name
-        provider: Option<String>,
-    },
-    
-    /// Show provider metrics
-    Metrics {
-        /// Provider name
-        provider: Option<String>,
-    },
-    
-    /// Configure provider
-    Configure {
-        /// Provider name
-        provider: String,
-    },
-}
-
-#[derive(Subcommand)]
-enum ConfigCommands {
-    /// Show current configuration
-    Show,
-    
-    /// Set configuration value
-    Set {
-        /// Configuration key
-        key: String,
+    Status {
+        /// Show detailed status
+        #[arg(short, long)]
+        detailed: bool,
         
-        /// Configuration value
-        value: String,
+        /// Check provider health
+        #[arg(short, long)]
+        health: bool,
     },
-    
-    /// Get configuration value
-    Get {
-        /// Configuration key
-        key: String,
-    },
-    
-    /// Reset configuration to defaults
-    Reset,
 }
 
 #[tokio::main]
@@ -254,8 +240,8 @@ async fn main() -> anyhow::Result<()> {
     // Initialize client
     let client = client::Client::new(&cli.server, &config)?;
     
-    // Print banner
-    if !matches!(cli.command, Commands::Chat { .. }) {
+    // Print banner for non-interactive commands
+    if !matches!(cli.command, Commands::Chat { .. } | Commands::Terminal) {
         print_banner();
     }
     
@@ -308,24 +294,32 @@ async fn main() -> anyhow::Result<()> {
             commands::refactor::run(file, instructions, output, backup, &client).await?;
         }
         
-        Commands::Translate { file, to, from, output } => {
-            commands::translate::run(file, to, from, output, &client).await?;
+        Commands::Translate { file, target, output } => {
+            commands::translate::run(file, target, output, &client).await?;
         }
         
-        Commands::Chat { message, model, provider } => {
-            commands::chat::run(message, model, provider, &client).await?;
+        Commands::Terminal => {
+            commands::terminal::run(&client).await?;
         }
         
-        Commands::Providers { action } => {
-            commands::providers::run(action, &client).await?;
+        Commands::Search { query, directory, extensions } => {
+            commands::search::run(query, directory, extensions, &client).await?;
         }
         
-        Commands::Status => {
-            commands::status::run(&client).await?;
+        Commands::Fix { file, issue_type, auto_apply } => {
+            commands::fix::run(file, issue_type, auto_apply, &client).await?;
         }
         
-        Commands::Config { action } => {
-            commands::config::run(action, &config).await?;
+        Commands::Chat { message, mode } => {
+            commands::chat::run(message, mode, &client).await?;
+        }
+        
+        Commands::Providers { action, name, key } => {
+            commands::providers::run(action, name, key, &client).await?;
+        }
+        
+        Commands::Status { detailed, health } => {
+            commands::status::run(detailed, health, &client).await?;
         }
     }
     
@@ -334,7 +328,6 @@ async fn main() -> anyhow::Result<()> {
 
 fn print_banner() {
     println!("{}", "🚀 Universal AI Development Assistant".bright_blue().bold());
-    println!("{}", "   Next-Generation AI-Powered Development Platform".bright_white());
-    println!("{}", "   Version 6.2.0 - Multi-Provider AI Integration".bright_green());
+    println!("{}", "   Your AI-powered coding companion".bright_white());
     println!();
 }

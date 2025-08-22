@@ -8,6 +8,9 @@ pub mod cohere;
 pub mod ollama;
 pub mod router;
 pub mod traits;
+pub mod streaming_traits;
+pub mod openrouter_streaming;
+pub mod cost_calculator;
 
 pub use router::ProviderRouter;
 pub use traits::{AIProvider, CompletionRequest, CompletionResponse, ProviderError};

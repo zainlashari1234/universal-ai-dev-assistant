@@ -1,4 +1,11 @@
-# 🚀 Universal AI Development Assistant v6.2.0
+# 🚀 Universal AI Development Assistant
+
+> **Durum**: Erken geliştirme aşamasında (v0.3.0-alpha)  
+> **Hedef**: Çoklu AI sağlayıcı desteği ile güvenlik odaklı geliştirme asistanı
+
+[![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Development Status](https://img.shields.io/badge/status-alpha-yellow.svg)](https://github.com/Tehlikeli107/universal-ai-dev-assistant)
 
 > **Next-Generation AI-Powered Development Platform with Multi-Provider Support**
 

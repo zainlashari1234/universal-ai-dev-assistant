@@ -1,411 +1,654 @@
 use anyhow::Result;
 use colored::*;
-use indicatif::{ProgressBar, ProgressStyle};
+use dialoguer::{theme::ColorfulTheme, Select, Confirm};
 use std::path::PathBuf;
-use syntect::easy::HighlightLines;
-use syntect::highlighting::{ThemeSet, Style};
-use syntect::parsing::SyntaxSet;
-use syntect::util::{as_24_bit_terminal_escaped, LinesWithEndings};
+use tokio::fs;
+use serde::{Deserialize, Serialize};
 
-use crate::client::{Client, CodeActionRequest};
+use crate::client::Client;
 
-pub async fn run(
-    file: PathBuf,
-    symbol: Option<String>,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExplainRequest {
+    pub session_id: Option<String>,
+    pub message: String,
+    pub current_file: Option<String>,
+    pub selected_text: Option<TextSelection>,
+    pub context_files: Vec<String>,
+    pub intent_hint: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TextSelection {
+    pub start_line: usize,
+    pub start_column: usize,
+    pub end_line: usize,
+    pub end_column: usize,
+    pub text: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExplainResponse {
+    pub success: bool,
+    pub response: ConversationResponse,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConversationResponse {
+    pub session_id: String,
+    pub ai_response: String,
+    pub intent: String,
+    pub confidence_score: f32,
+    pub code_changes: Option<Vec<CodeChange>>,
+    pub suggested_actions: Vec<SuggestedAction>,
+    pub file_references: Vec<String>,
+    pub follow_up_questions: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CodeChange {
+    pub file_path: String,
+    pub change_type: String,
+    pub new_content: String,
+    pub description: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SuggestedAction {
+    pub action_type: String,
+    pub description: String,
+    pub command: Option<String>,
+    pub priority: String,
+}
+
+pub async fn run_explain(
+    file_path: Option<PathBuf>,
+    line_range: Option<String>,
+    function_name: Option<String>,
+    with_examples: bool,
+    search_similar: bool,
     client: &Client,
 ) -> Result<()> {
-    println!("{}", "🧠 AI Code Explainer".bright_blue().bold());
+    println!("{}", "📖 AI Kod Açıklayıcı".bright_blue().bold());
     println!();
 
-    // Check if file exists
-    if !file.exists() {
-        println!("{} File not found: {}", "❌".bright_red(), file.display());
-        return Ok(());
-    }
-
-    // Read file content
-    let code = std::fs::read_to_string(&file)?;
-    if code.trim().is_empty() {
-        println!("{} File is empty", "⚠️".bright_yellow());
-        return Ok(());
-    }
-
-    // Detect language
-    let language = detect_language_from_extension(&file);
-
-    // Extract specific symbol if requested
-    let (code_to_explain, explanation_scope) = if let Some(ref symbol_name) = symbol {
-        match extract_symbol(&code, symbol_name, &language) {
-            Some(extracted) => (extracted, format!("symbol '{}'", symbol_name)),
-            None => {
-                println!("{} Symbol '{}' not found in file", "⚠️".bright_yellow(), symbol_name);
-                (code.clone(), "entire file".to_string())
-            }
-        }
+    let target_file = if let Some(path) = file_path {
+        path
     } else {
-        (code.clone(), "entire file".to_string())
+        // Mevcut dizindeki dosyaları listele
+        select_file_interactively().await?
     };
 
-    println!("{}", "📁 Explanation Target:".bright_cyan().bold());
-    println!("  {} {}", "File:".bright_white(), file.display().to_string().bright_green());
-    println!("  {} {}", "Language:".bright_white(), language.bright_green());
-    println!("  {} {}", "Scope:".bright_white(), explanation_scope.bright_magenta());
-    println!("  {} {} lines", "Code size:".bright_white(), code_to_explain.lines().count().to_string().bright_yellow());
-    println!();
+    if !target_file.exists() {
+        println!("{} Dosya bulunamadı: {}", "❌".bright_red(), target_file.display());
+        return Ok(());
+    }
 
-    // Show the code being explained with syntax highlighting
-    println!("{}", "📄 Code to Explain:".bright_cyan().bold());
-    print_code_with_syntax_highlighting(&code_to_explain, &language);
-    println!();
+    println!("{} {}", "📁 Açıklanacak dosya:".bright_blue(), target_file.display().to_string().bright_white());
 
-    // Show progress
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(ProgressStyle::default_spinner()
-        .template("{spinner:.green} {msg}")
-        .unwrap());
-    pb.set_message("Analyzing and explaining code...");
-    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+    // Dosya içeriğini oku
+    let content = fs::read_to_string(&target_file).await?;
+    let lines: Vec<&str> = content.lines().collect();
 
-    let instructions = format!(
-        "Explain this {} code in detail. Include:\n\
-        - What the code does (high-level purpose)\n\
-        - How it works (step-by-step breakdown)\n\
-        - Key concepts and algorithms used\n\
-        - Input/output behavior\n\
-        - Important design decisions\n\
-        - Potential edge cases or limitations\n\
-        - Best practices demonstrated or violated",
-        language
-    );
-
-    let request = CodeActionRequest {
-        code: code_to_explain.clone(),
-        language: language.clone(),
-        action: "explain".to_string(),
-        instructions: Some(instructions),
-        target_language: None,
+    // Açıklanacak kısmı belirle
+    let (selected_content, start_line, end_line) = if let Some(func_name) = function_name {
+        extract_function(&content, &func_name)?
+    } else if let Some(range) = line_range {
+        extract_line_range(&lines, &range)?
+    } else {
+        // İnteraktif seçim
+        select_code_section(&content, &target_file).await?
     };
 
-    match client.code_action(request).await {
+    println!("{} {}:{}", "📍 Seçilen bölüm:".bright_blue(), start_line, end_line);
+    println!();
+
+    // Kod önizlemesi göster
+    display_code_preview(&selected_content, start_line);
+
+    // Açıklama isteği oluştur
+    let mut message = format!("Bu kodu detaylı olarak açıkla:\n\n```\n{}\n```", selected_content);
+    
+    if with_examples {
+        message.push_str("\n\nLütfen kod örnekleri ve kullanım senaryoları da ekle.");
+    }
+
+    let explain_request = ExplainRequest {
+        session_id: None,
+        message,
+        current_file: Some(target_file.to_string_lossy().to_string()),
+        selected_text: Some(TextSelection {
+            start_line,
+            start_column: 0,
+            end_line,
+            end_column: 0,
+            text: selected_content.clone(),
+        }),
+        context_files: vec![target_file.to_string_lossy().to_string()],
+        intent_hint: Some("CodeExplanation".to_string()),
+    };
+
+    // AI açıklaması al
+    println!("{}", "🤖 AI açıklama oluşturuyor...".bright_yellow());
+    
+    match get_explanation(&explain_request, client).await {
         Ok(response) => {
-            pb.finish_and_clear();
+            display_explanation(&response, &selected_content).await?;
             
-            // Display explanation
-            println!("{}", "🧠 Code Explanation:".bright_green().bold());
-            println!();
+            // Benzer kod arama
+            if search_similar {
+                search_similar_code(&selected_content, &target_file, client).await?;
+            }
             
-            // Format and display the explanation
-            display_formatted_explanation(&response.result);
-            
-            // Show code complexity analysis
-            println!();
-            println!("{}", "📊 Code Analysis:".bright_blue().bold());
-            analyze_code_complexity(&code_to_explain, &language);
-            
-            // Show related concepts
-            println!();
-            println!("{}", "🔗 Related Concepts:".bright_magenta().bold());
-            suggest_related_concepts(&code_to_explain, &language);
-
+            // Follow-up actions
+            handle_explanation_actions(&response, &target_file, client).await?;
         }
         Err(e) => {
-            pb.finish_and_clear();
-            println!("{} Code explanation failed: {}", "❌".bright_red().bold(), e);
+            println!("{} {}", "❌ Açıklama alınamadı:".bright_red(), e);
         }
     }
 
     Ok(())
 }
 
-fn detect_language_from_extension(file: &PathBuf) -> String {
-    match file.extension().and_then(|ext| ext.to_str()) {
-        Some("rs") => "rust".to_string(),
-        Some("py") => "python".to_string(),
-        Some("js") => "javascript".to_string(),
-        Some("ts") => "typescript".to_string(),
-        Some("go") => "go".to_string(),
-        Some("java") => "java".to_string(),
-        Some("cpp") | Some("cc") | Some("cxx") => "cpp".to_string(),
-        Some("c") => "c".to_string(),
-        Some("h") | Some("hpp") => "c".to_string(),
-        Some("php") => "php".to_string(),
-        Some("rb") => "ruby".to_string(),
-        Some("swift") => "swift".to_string(),
-        Some("kt") => "kotlin".to_string(),
-        Some("cs") => "csharp".to_string(),
-        Some("sh") => "bash".to_string(),
-        _ => "text".to_string(),
-    }
-}
+async fn select_file_interactively() -> Result<PathBuf> {
+    let current_dir = std::env::current_dir()?;
+    let mut entries = fs::read_dir(&current_dir).await?;
+    let mut files = Vec::new();
 
-fn extract_symbol(code: &str, symbol_name: &str, language: &str) -> Option<String> {
-    match language {
-        "rust" => extract_rust_symbol(code, symbol_name),
-        "python" => extract_python_symbol(code, symbol_name),
-        "javascript" | "typescript" => extract_js_symbol(code, symbol_name),
-        "java" => extract_java_symbol(code, symbol_name),
-        "cpp" | "c" => extract_c_symbol(code, symbol_name),
-        _ => extract_generic_symbol(code, symbol_name),
-    }
-}
-
-fn extract_rust_symbol(code: &str, symbol_name: &str) -> Option<String> {
-    let lines: Vec<&str> = code.lines().collect();
-    let mut result = Vec::new();
-    let mut in_function = false;
-    let mut brace_count = 0;
-    
-    for line in lines {
-        if line.contains(&format!("fn {}", symbol_name)) || 
-           line.contains(&format!("struct {}", symbol_name)) ||
-           line.contains(&format!("enum {}", symbol_name)) ||
-           line.contains(&format!("impl {}", symbol_name)) {
-            in_function = true;
-            brace_count = 0;
-        }
-        
-        if in_function {
-            result.push(line);
-            brace_count += line.matches('{').count() as i32;
-            brace_count -= line.matches('}').count() as i32;
-            
-            if brace_count == 0 && line.contains('}') {
-                break;
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if path.is_file() {
+            if let Some(extension) = path.extension() {
+                let ext = extension.to_string_lossy().to_lowercase();
+                if matches!(ext.as_str(), "rs" | "js" | "ts" | "py" | "java" | "go" | "cpp" | "c" | "cs") {
+                    files.push(path);
+                }
             }
         }
     }
-    
-    if result.is_empty() { None } else { Some(result.join("\n")) }
+
+    if files.is_empty() {
+        return Err(anyhow::anyhow!("Mevcut dizinde desteklenen kod dosyası bulunamadı"));
+    }
+
+    let file_names: Vec<String> = files.iter()
+        .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+        .collect();
+
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Hangi dosyayı açıklamak istiyorsunuz?")
+        .items(&file_names)
+        .interact()?;
+
+    Ok(files[selection].clone())
 }
 
-fn extract_python_symbol(code: &str, symbol_name: &str) -> Option<String> {
-    let lines: Vec<&str> = code.lines().collect();
-    let mut result = Vec::new();
-    let mut in_function = false;
-    let mut base_indent = 0;
-    
-    for line in lines {
-        let current_indent = line.len() - line.trim_start().len();
-        
-        if line.trim_start().starts_with(&format!("def {}", symbol_name)) ||
-           line.trim_start().starts_with(&format!("class {}", symbol_name)) {
-            in_function = true;
-            base_indent = current_indent;
-            result.push(line);
-            continue;
+async fn select_code_section(content: &str, file_path: &PathBuf) -> Result<(String, usize, usize)> {
+    let options = vec![
+        "📄 Tüm dosyayı açıkla",
+        "🔧 Belirli bir fonksiyonu seç",
+        "📏 Satır aralığı belirle",
+        "🎯 İnteraktif seçim",
+    ];
+
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Neyi açıklamak istiyorsunuz?")
+        .items(&options)
+        .interact()?;
+
+    match selection {
+        0 => {
+            // Tüm dosya
+            let line_count = content.lines().count();
+            Ok((content.to_string(), 1, line_count))
         }
-        
-        if in_function {
-            if line.trim().is_empty() || current_indent > base_indent {
-                result.push(line);
+        1 => {
+            // Fonksiyon seçimi
+            let functions = extract_functions(content, file_path)?;
+            if functions.is_empty() {
+                println!("{}", "⚠️ Bu dosyada fonksiyon bulunamadı.".bright_yellow());
+                Ok((content.to_string(), 1, content.lines().count()))
             } else {
-                break;
+                let func_names: Vec<String> = functions.iter().map(|f| f.name.clone()).collect();
+                let func_selection = Select::with_theme(&ColorfulTheme::default())
+                    .with_prompt("Hangi fonksiyonu açıklamak istiyorsunuz?")
+                    .items(&func_names)
+                    .interact()?;
+                
+                let selected_func = &functions[func_selection];
+                Ok((selected_func.content.clone(), selected_func.start_line, selected_func.end_line))
             }
         }
-    }
-    
-    if result.is_empty() { None } else { Some(result.join("\n")) }
-}
-
-fn extract_js_symbol(code: &str, symbol_name: &str) -> Option<String> {
-    let lines: Vec<&str> = code.lines().collect();
-    let mut result = Vec::new();
-    let mut in_function = false;
-    let mut brace_count = 0;
-    
-    for line in lines {
-        if line.contains(&format!("function {}", symbol_name)) ||
-           line.contains(&format!("const {} =", symbol_name)) ||
-           line.contains(&format!("let {} =", symbol_name)) ||
-           line.contains(&format!("var {} =", symbol_name)) ||
-           line.contains(&format!("class {}", symbol_name)) {
-            in_function = true;
-            brace_count = 0;
-        }
-        
-        if in_function {
-            result.push(line);
-            brace_count += line.matches('{').count() as i32;
-            brace_count -= line.matches('}').count() as i32;
+        2 => {
+            // Satır aralığı
+            println!("{}", "📏 Satır aralığı formatı: 'başlangıç-bitiş' (örn: 10-25)".dimmed());
+            let range: String = dialoguer::Input::with_theme(&ColorfulTheme::default())
+                .with_prompt("Satır aralığı")
+                .interact_text()?;
             
-            if brace_count == 0 && line.contains('}') {
-                break;
-            }
+            let lines: Vec<&str> = content.lines().collect();
+            extract_line_range(&lines, &range)
         }
+        3 => {
+            // İnteraktif seçim - fonksiyonları listele
+            interactive_code_selection(content, file_path).await
+        }
+        _ => Ok((content.to_string(), 1, content.lines().count())),
     }
-    
-    if result.is_empty() { None } else { Some(result.join("\n")) }
 }
 
-fn extract_java_symbol(code: &str, symbol_name: &str) -> Option<String> {
-    extract_c_symbol(code, symbol_name) // Similar brace-based extraction
-}
-
-fn extract_c_symbol(code: &str, symbol_name: &str) -> Option<String> {
-    let lines: Vec<&str> = code.lines().collect();
-    let mut result = Vec::new();
-    let mut in_function = false;
-    let mut brace_count = 0;
+fn extract_function(content: &str, function_name: &str) -> Result<(String, usize, usize)> {
+    let lines: Vec<&str> = content.lines().collect();
     
-    for line in lines {
-        if line.contains(symbol_name) && (line.contains('(') || line.contains("struct") || line.contains("class")) {
-            in_function = true;
-            brace_count = 0;
-        }
-        
-        if in_function {
-            result.push(line);
-            brace_count += line.matches('{').count() as i32;
-            brace_count -= line.matches('}').count() as i32;
-            
-            if brace_count == 0 && line.contains('}') {
-                break;
-            }
-        }
-    }
-    
-    if result.is_empty() { None } else { Some(result.join("\n")) }
-}
-
-fn extract_generic_symbol(code: &str, symbol_name: &str) -> Option<String> {
-    // Simple line-based extraction for unknown languages
-    let lines: Vec<&str> = code.lines().collect();
-    let mut result = Vec::new();
-    
+    // Basit fonksiyon arama (dil agnostik)
     for (i, line) in lines.iter().enumerate() {
-        if line.contains(symbol_name) {
-            // Include some context around the symbol
-            let start = i.saturating_sub(2);
-            let end = std::cmp::min(i + 5, lines.len());
-            result.extend_from_slice(&lines[start..end]);
+        if line.contains(function_name) && 
+           (line.contains("fn ") || line.contains("function ") || line.contains("def ") || 
+            line.contains("func ") || line.contains("public ") || line.contains("private ")) {
+            
+            // Fonksiyon sonunu bul
+            let mut brace_count = 0;
+            let mut end_line = i;
+            let mut found_opening = false;
+            
+            for (j, check_line) in lines.iter().enumerate().skip(i) {
+                for ch in check_line.chars() {
+                    match ch {
+                        '{' => {
+                            brace_count += 1;
+                            found_opening = true;
+                        }
+                        '}' => {
+                            brace_count -= 1;
+                            if found_opening && brace_count == 0 {
+                                end_line = j;
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                if found_opening && brace_count == 0 {
+                    break;
+                }
+            }
+            
+            let function_content = lines[i..=end_line].join("\n");
+            return Ok((function_content, i + 1, end_line + 1));
+        }
+    }
+    
+    Err(anyhow::anyhow!("Fonksiyon bulunamadı: {}", function_name))
+}
+
+fn extract_line_range(lines: &[&str], range: &str) -> Result<(String, usize, usize)> {
+    let parts: Vec<&str> = range.split('-').collect();
+    if parts.len() != 2 {
+        return Err(anyhow::anyhow!("Geçersiz satır aralığı formatı. Kullanım: 'başlangıç-bitiş'"));
+    }
+    
+    let start: usize = parts[0].trim().parse()?;
+    let end: usize = parts[1].trim().parse()?;
+    
+    if start == 0 || end == 0 || start > end || end > lines.len() {
+        return Err(anyhow::anyhow!("Geçersiz satır aralığı: {}-{}", start, end));
+    }
+    
+    let selected_lines = lines[(start-1)..end].join("\n");
+    Ok((selected_lines, start, end))
+}
+
+#[derive(Debug)]
+struct FunctionInfo {
+    name: String,
+    content: String,
+    start_line: usize,
+    end_line: usize,
+}
+
+fn extract_functions(content: &str, file_path: &PathBuf) -> Result<Vec<FunctionInfo>> {
+    let mut functions = Vec::new();
+    let lines: Vec<&str> = content.lines().collect();
+    
+    let extension = file_path.extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("");
+    
+    let function_patterns = match extension {
+        "rs" => vec![r"fn\s+(\w+)", r"pub\s+fn\s+(\w+)", r"async\s+fn\s+(\w+)"],
+        "js" | "ts" => vec![r"function\s+(\w+)", r"const\s+(\w+)\s*=", r"(\w+)\s*:\s*function"],
+        "py" => vec![r"def\s+(\w+)", r"async\s+def\s+(\w+)"],
+        "java" | "cs" => vec![r"public\s+\w+\s+(\w+)\s*\(", r"private\s+\w+\s+(\w+)\s*\("],
+        "go" => vec![r"func\s+(\w+)", r"func\s+\(\w+\s+\*?\w+\)\s+(\w+)"],
+        "cpp" | "c" => vec![r"\w+\s+(\w+)\s*\("],
+        _ => vec![r"(\w+)\s*\("],
+    };
+    
+    for pattern_str in function_patterns {
+        let pattern = regex::Regex::new(pattern_str)?;
+        
+        for (i, line) in lines.iter().enumerate() {
+            if let Some(captures) = pattern.captures(line) {
+                if let Some(func_name) = captures.get(1) {
+                    // Fonksiyon sonunu bul
+                    let (content, end_line) = extract_function_body(&lines, i, extension);
+                    
+                    functions.push(FunctionInfo {
+                        name: func_name.as_str().to_string(),
+                        content,
+                        start_line: i + 1,
+                        end_line: end_line + 1,
+                    });
+                }
+            }
+        }
+    }
+    
+    // Duplicates'leri kaldır
+    functions.sort_by(|a, b| a.start_line.cmp(&b.start_line));
+    functions.dedup_by(|a, b| a.name == b.name && a.start_line == b.start_line);
+    
+    Ok(functions)
+}
+
+fn extract_function_body(lines: &[&str], start_line: usize, extension: &str) -> (String, usize) {
+    let mut end_line = start_line;
+    let mut brace_count = 0;
+    let mut found_opening = false;
+    
+    // Python için özel handling
+    if extension == "py" {
+        let base_indent = lines[start_line].len() - lines[start_line].trim_start().len();
+        
+        for (i, line) in lines.iter().enumerate().skip(start_line + 1) {
+            if line.trim().is_empty() {
+                continue;
+            }
+            
+            let current_indent = line.len() - line.trim_start().len();
+            if current_indent <= base_indent && !line.trim().is_empty() {
+                end_line = i - 1;
+                break;
+            }
+            end_line = i;
+        }
+    } else {
+        // Brace-based languages
+        for (i, line) in lines.iter().enumerate().skip(start_line) {
+            for ch in line.chars() {
+                match ch {
+                    '{' => {
+                        brace_count += 1;
+                        found_opening = true;
+                    }
+                    '}' => {
+                        brace_count -= 1;
+                        if found_opening && brace_count == 0 {
+                            end_line = i;
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if found_opening && brace_count == 0 {
+                break;
+            }
+        }
+    }
+    
+    let content = lines[start_line..=end_line].join("\n");
+    (content, end_line)
+}
+
+async fn interactive_code_selection(content: &str, file_path: &PathBuf) -> Result<(String, usize, usize)> {
+    let functions = extract_functions(content, file_path)?;
+    
+    if functions.is_empty() {
+        println!("{}", "ℹ️ Bu dosyada fonksiyon bulunamadı, tüm dosya gösterilecek.".bright_blue());
+        return Ok((content.to_string(), 1, content.lines().count()));
+    }
+    
+    println!("{}", "🔧 Bulunan fonksiyonlar:".bright_blue().bold());
+    for (i, func) in functions.iter().enumerate() {
+        println!("  {}. {} ({}:{})", 
+            i + 1, 
+            func.name.bright_white(), 
+            func.start_line, 
+            func.end_line
+        );
+    }
+    
+    let mut options: Vec<String> = functions.iter()
+        .map(|f| format!("{} ({}:{})", f.name, f.start_line, f.end_line))
+        .collect();
+    options.push("📄 Tüm dosya".to_string());
+    
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Hangi kısmı açıklamak istiyorsunuz?")
+        .items(&options)
+        .interact()?;
+    
+    if selection == functions.len() {
+        // Tüm dosya seçildi
+        Ok((content.to_string(), 1, content.lines().count()))
+    } else {
+        let selected_func = &functions[selection];
+        Ok((selected_func.content.clone(), selected_func.start_line, selected_func.end_line))
+    }
+}
+
+fn display_code_preview(content: &str, start_line: usize) {
+    println!("{}", "📄 Kod Önizlemesi".bright_blue().bold());
+    println!("{}", "─".repeat(60).dimmed());
+    
+    for (i, line) in content.lines().enumerate() {
+        let line_num = start_line + i;
+        println!("{:4} │ {}", 
+            line_num.to_string().dimmed(), 
+            line
+        );
+        
+        // İlk 10 satırdan fazlaysa kısalt
+        if i >= 10 && content.lines().count() > 15 {
+            let remaining = content.lines().count() - i - 1;
+            println!("{}", format!("     │ ... ({} satır daha)", remaining).dimmed());
             break;
         }
     }
     
-    if result.is_empty() { None } else { Some(result.join("\n")) }
+    println!("{}", "─".repeat(60).dimmed());
+    println!();
 }
 
-fn print_code_with_syntax_highlighting(code: &str, language: &str) {
-    let ps = SyntaxSet::load_defaults_newlines();
-    let ts = ThemeSet::load_defaults();
+async fn get_explanation(request: &ExplainRequest, client: &Client) -> Result<ExplainResponse> {
+    let response: ExplainResponse = client.post("/conversation/message", request).await?;
+    Ok(response)
+}
+
+async fn display_explanation(response: &ExplainResponse, code: &str) -> Result<()> {
+    let conv_response = &response.response;
     
-    let syntax = ps.find_syntax_by_extension(language)
-        .or_else(|| ps.find_syntax_by_name(language))
-        .unwrap_or_else(|| ps.find_syntax_plain_text());
+    println!("{}", "🤖 AI Açıklaması".bright_green().bold());
+    println!("{}", "=".repeat(80).bright_green());
+    println!();
     
-    let mut h = HighlightLines::new(syntax, &ts.themes["base16-ocean.dark"]);
+    // Ana açıklama
+    println!("{}", conv_response.ai_response);
+    println!();
     
-    println!("  {}", "```".bright_black().dimmed());
-    for (i, line) in LinesWithEndings::from(code).enumerate() {
-        let ranges: Vec<(Style, &str)> = h.highlight_line(line, &ps).unwrap();
-        let escaped = as_24_bit_terminal_escaped(&ranges[..], false);
-        print!("  {:3} {}", (i + 1).to_string().bright_black().dimmed(), escaped);
+    // Güven skoru
+    println!("{} {:.1}%", 
+        "📊 Güven skoru:".bright_blue(), 
+        conv_response.confidence_score * 100.0
+    );
+    
+    // Dosya referansları
+    if !conv_response.file_references.is_empty() {
+        println!("{} {}", 
+            "📁 İlgili dosyalar:".bright_blue(), 
+            conv_response.file_references.join(", ").bright_white()
+        );
     }
-    println!("  {}", "```".bright_black().dimmed());
-}
-
-fn display_formatted_explanation(explanation: &str) {
-    // Split explanation into sections and format nicely
-    let sections = explanation.split("\n\n");
     
-    for section in sections {
-        if section.trim().is_empty() {
-            continue;
-        }
-        
-        // Check if this looks like a heading
-        if section.lines().count() == 1 && section.len() < 100 {
-            println!("  {} {}", "▶".bright_blue(), section.bright_white().bold());
-        } else {
-            // Regular paragraph
-            for line in section.lines() {
-                println!("    {}", line.bright_white());
+    // Önerilen aksiyonlar
+    if !conv_response.suggested_actions.is_empty() {
+        println!();
+        println!("{}", "💡 Önerilen Aksiyonlar".bright_yellow().bold());
+        for action in &conv_response.suggested_actions {
+            let priority_icon = match action.priority.as_str() {
+                "High" => "🔴",
+                "Medium" => "🟡", 
+                "Low" => "🟢",
+                _ => "⚪",
+            };
+            
+            println!("  {} {} {}", 
+                priority_icon, 
+                action.description.bright_white(),
+                action.action_type.dimmed()
+            );
+            
+            if let Some(command) = &action.command {
+                println!("    {} {}", "💻".bright_blue(), command.bright_cyan());
             }
         }
+    }
+    
+    // Follow-up sorular
+    if !conv_response.follow_up_questions.is_empty() {
         println!();
+        println!("{}", "❓ İlgili Sorular".bright_cyan().bold());
+        for question in &conv_response.follow_up_questions {
+            println!("  {} {}", "•".bright_cyan(), question.bright_white());
+        }
     }
+    
+    println!();
+    Ok(())
 }
 
-fn analyze_code_complexity(code: &str, language: &str) {
-    let lines = code.lines().count();
-    let chars = code.len();
-    let functions = count_functions(code, language);
-    let complexity = estimate_complexity(code, language);
+async fn search_similar_code(code: &str, file_path: &PathBuf, client: &Client) -> Result<()> {
+    println!("{}", "🔍 Benzer kod aranıyor...".bright_yellow());
     
-    println!("  {} {} lines", "Lines of code:".bright_white(), lines.to_string().bright_yellow());
-    println!("  {} {} characters", "Characters:".bright_white(), chars.to_string().bright_yellow());
-    println!("  {} {} functions", "Functions:".bright_white(), functions.to_string().bright_cyan());
-    println!("  {} {}", "Complexity:".bright_white(), 
-        match complexity {
-            1..=3 => "Low".bright_green(),
-            4..=7 => "Medium".bright_yellow(),
-            _ => "High".bright_red(),
+    let search_request = serde_json::json!({
+        "code_snippet": code,
+        "workspace_paths": [std::env::current_dir()?.to_string_lossy()]
+    });
+    
+    match client.post::<serde_json::Value, _>("/search/similar", &search_request).await {
+        Ok(response) => {
+            if let Some(results) = response["response"]["results"].as_array() {
+                if !results.is_empty() {
+                    println!();
+                    println!("{}", "🎯 Benzer Kodlar Bulundu".bright_green().bold());
+                    
+                    for (i, result) in results.iter().take(3).enumerate() {
+                        if let (Some(file_path), Some(relevance)) = (
+                            result["file_path"].as_str(),
+                            result["relevance_score"].as_f64()
+                        ) {
+                            println!("  {}. {} ({:.2})", 
+                                i + 1, 
+                                file_path.bright_white(), 
+                                relevance
+                            );
+                        }
+                    }
+                } else {
+                    println!("{}", "ℹ️ Benzer kod bulunamadı.".bright_blue());
+                }
+            }
         }
-    );
+        Err(e) => {
+            println!("{} {}", "⚠️ Benzer kod arama hatası:".bright_yellow(), e);
+        }
+    }
+    
+    Ok(())
 }
 
-fn count_functions(code: &str, language: &str) -> usize {
-    match language {
-        "rust" => code.matches("fn ").count(),
-        "python" => code.matches("def ").count(),
-        "javascript" | "typescript" => code.matches("function ").count() + code.matches(" => ").count(),
-        "java" | "cpp" | "c" => code.matches("(").count(), // Rough estimate
-        _ => 0,
+async fn handle_explanation_actions(
+    response: &ExplainResponse, 
+    file_path: &PathBuf, 
+    client: &Client
+) -> Result<()> {
+    let actions = vec![
+        "💬 Bu kod hakkında soru sor",
+        "🔍 Benzer kodları ara", 
+        "🔧 Kod iyileştirme önerileri al",
+        "📝 Bu kodu test et",
+        "📁 Dosyayı editörde aç",
+        "❌ Hiçbiri",
+    ];
+
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Ne yapmak istiyorsunuz?")
+        .items(&actions)
+        .default(5)
+        .interact_opt()?;
+
+    if let Some(choice) = selection {
+        match choice {
+            0 => {
+                println!("{}", "💬 Soru sorma özelliği yakında eklenecek!".bright_yellow());
+                // TODO: Interactive Q&A session
+            }
+            1 => {
+                println!("{}", "🔍 Benzer kod arama özelliği yakında eklenecek!".bright_yellow());
+                // TODO: Similar code search
+            }
+            2 => {
+                println!("{}", "🔧 Kod iyileştirme özelliği yakında eklenecek!".bright_yellow());
+                // TODO: Code improvement suggestions
+            }
+            3 => {
+                println!("{}", "📝 Test oluşturma özelliği yakında eklenecek!".bright_yellow());
+                // TODO: Test generation
+            }
+            4 => {
+                // Dosyayı editörde aç
+                open_file_in_editor(file_path).await?;
+            }
+            _ => {}
+        }
     }
+
+    Ok(())
 }
 
-fn estimate_complexity(code: &str, _language: &str) -> usize {
-    let control_structures = code.matches("if ").count() + 
-                           code.matches("for ").count() + 
-                           code.matches("while ").count() + 
-                           code.matches("match ").count() + 
-                           code.matches("switch ").count();
+async fn open_file_in_editor(file_path: &PathBuf) -> Result<()> {
+    let editors = ["code", "vim", "nano", "gedit"];
     
-    std::cmp::max(1, control_structures)
-}
-
-fn suggest_related_concepts(code: &str, language: &str) {
-    let mut concepts = Vec::new();
-    
-    // Language-specific concepts
-    match language {
-        "rust" => {
-            if code.contains("Option") || code.contains("Result") { concepts.push("Error handling"); }
-            if code.contains("Vec") || code.contains("HashMap") { concepts.push("Collections"); }
-            if code.contains("async") || code.contains("await") { concepts.push("Async programming"); }
-            if code.contains("impl") { concepts.push("Traits and implementations"); }
+    for editor in &editors {
+        if std::process::Command::new("which")
+            .arg(editor)
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false)
+        {
+            println!("{} {} ile açılıyor: {}", 
+                "📝".bright_blue(), 
+                editor, 
+                file_path.display().to_string().bright_white()
+            );
+            
+            match std::process::Command::new(editor)
+                .arg(file_path)
+                .spawn()
+            {
+                Ok(_) => {
+                    println!("{}", "✅ Dosya açıldı!".bright_green());
+                    return Ok(());
+                }
+                Err(e) => {
+                    println!("{} {} ile açılamadı: {}", "⚠️".bright_yellow(), editor, e);
+                }
+            }
         }
-        "python" => {
-            if code.contains("class ") { concepts.push("Object-oriented programming"); }
-            if code.contains("def ") { concepts.push("Functions and methods"); }
-            if code.contains("import ") { concepts.push("Modules and packages"); }
-            if code.contains("try:") { concepts.push("Exception handling"); }
-        }
-        "javascript" | "typescript" => {
-            if code.contains("async") || code.contains("Promise") { concepts.push("Asynchronous programming"); }
-            if code.contains("class ") { concepts.push("ES6 classes"); }
-            if code.contains("=>") { concepts.push("Arrow functions"); }
-            if code.contains("import ") { concepts.push("ES6 modules"); }
-        }
-        _ => {}
     }
     
-    // General programming concepts
-    if code.contains("loop") || code.contains("for") || code.contains("while") {
-        concepts.push("Iteration and loops");
-    }
-    if code.contains("if") || code.contains("else") {
-        concepts.push("Conditional logic");
-    }
-    if code.contains("return") {
-        concepts.push("Function return values");
-    }
-    
-    for concept in concepts {
-        println!("  {} {}", "•".bright_blue(), concept.bright_white());
-    }
-    
-    if concepts.is_empty() {
-        println!("  {} No specific concepts detected", "•".bright_black().dimmed());
-    }
+    println!("{}", "❌ Uygun editör bulunamadı. Dosya yolu:".bright_red());
+    println!("{}", file_path.display().to_string().bright_white());
+    Ok(())
 }

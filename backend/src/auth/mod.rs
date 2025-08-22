@@ -3,12 +3,23 @@ pub mod rbac;
 pub mod jwt;
 pub mod middleware;
 pub mod audit;
+pub mod api_key_manager;
+pub mod user_service;
+pub mod handlers;
+pub mod organization;
+pub mod preferences;
+pub mod preferences_handlers;
 
 pub use sso::*;
 pub use rbac::*;
 pub use jwt::*;
 pub use middleware::*;
 pub use audit::*;
+pub use api_key_manager::*;
+pub use user_service::*;
+pub use handlers::*;
+pub use organization::*;
+pub use preferences::*;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

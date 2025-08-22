@@ -1,27 +1,80 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './pages/Dashboard';
 import { Playground } from './pages/Playground';
 import { Settings } from './pages/Settings';
-import { Documentation } from './pages/Documentation';
+import { Analytics } from './pages/Analytics';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
 import './App.css';
+
+// Protected Route Component
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+  
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+};
+
+// Main App Layout
+const AppLayout: React.FC = () => {
+  const { isAuthenticated } = useAuth();
+  
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {isAuthenticated && <Navbar />}
+      <main className={isAuthenticated ? "container mx-auto px-4 py-8" : ""}>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          {/* Protected Routes */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/playground" element={
+            <ProtectedRoute>
+              <Playground />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          } />
+          <Route path="/analytics" element={
+            <ProtectedRoute>
+              <Analytics />
+            </ProtectedRoute>
+          } />
+          
+          {/* Redirect unknown routes */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+    </div>
+  );
+};
 
 function App() {
   return (
-    <Router>
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <main className="container mx-auto px-4 py-8">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/playground" element={<Playground />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/docs" element={<Documentation />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <AppLayout />
+      </Router>
+    </AuthProvider>
   );
 }
 

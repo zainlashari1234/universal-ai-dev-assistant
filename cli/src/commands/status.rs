@@ -1,108 +1,117 @@
 use anyhow::Result;
 use colored::*;
-use indicatif::{ProgressBar, ProgressStyle};
-
 use crate::client::Client;
 
-pub async fn run(client: &Client) -> Result<()> {
+pub async fn run(detailed: bool, health: bool, client: &Client) -> Result<()> {
     println!("{}", "📊 UAIDA System Status".bright_blue().bold());
     println!();
 
-    // Show progress while checking
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(ProgressStyle::default_spinner()
-        .template("{spinner:.green} {msg}")
-        .unwrap());
-    pb.set_message("Checking system status...");
-    pb.enable_steady_tick(std::time::Duration::from_millis(100));
-
-    match client.health().await {
-        Ok(health) => {
-            pb.finish_and_clear();
+    // Basic health check
+    println!("{}", "🏥 Health Check".bright_white().bold());
+    match client.get("/health").await {
+        Ok(response) => {
+            println!("  {} {}", "Status:".bright_white(), "Healthy".bright_green().bold());
             
-            // System status
-            println!("{}", "🏥 System Health".bright_green().bold());
-            println!("  {} {}", "Status:".bright_white(), 
-                if health.status == "healthy" { 
-                    health.status.bright_green() 
-                } else { 
-                    health.status.bright_red() 
-                });
-            println!("  {} {}", "Version:".bright_white(), health.version.bright_cyan());
-            println!();
-            
-            // Provider status
-            println!("{}", "🤖 AI Providers".bright_blue().bold());
-            for (name, provider) in &health.providers {
-                let status_icon = if provider.is_available { "✅" } else { "❌" };
-                let status_text = if provider.is_available { 
-                    "Available".bright_green() 
-                } else { 
-                    "Unavailable".bright_red() 
-                };
-                
-                println!("  {} {} {}", status_icon, name.bright_white().bold(), status_text);
-                
-                if let Some(response_time) = provider.response_time_ms {
-                    println!("    {} {}ms", "Response time:".bright_white().dimmed(), 
-                        response_time.to_string().bright_yellow());
-                }
-                
-                if !provider.models_available.is_empty() {
-                    println!("    {} {}", "Models:".bright_white().dimmed(), 
-                        provider.models_available.len().to_string().bright_yellow());
-                }
-                
-                if let Some(error) = &provider.error_message {
-                    println!("    {} {}", "Error:".bright_red().dimmed(), error.bright_red());
-                }
-            }
-            println!();
-            
-            // Features
-            println!("{}", "🎯 Available Features".bright_cyan().bold());
-            for feature in &health.features {
-                println!("  ✨ {}", feature.bright_white());
-            }
-            println!();
-            
-            // Get additional metrics
-            if let Ok(providers_info) = client.providers().await {
-                println!("{}", "📈 Provider Metrics".bright_magenta().bold());
-                for (name, metrics) in &providers_info.provider_metrics {
-                    if metrics.total_requests > 0 {
-                        println!("  {} {}", name.bright_white().bold(), ":");
-                        println!("    {} {}", "Total requests:".bright_white().dimmed(), 
-                            metrics.total_requests.to_string().bright_yellow());
-                        println!("    {} {:.1}%", "Success rate:".bright_white().dimmed(), 
-                            (metrics.successful_requests as f64 / metrics.total_requests as f64 * 100.0).to_string().bright_green());
-                        println!("    {} {:.1}ms", "Avg response:".bright_white().dimmed(), 
-                            metrics.average_response_time_ms.to_string().bright_cyan());
-                        if metrics.cost_usd > 0.0 {
-                            println!("    {} ${:.4}", "Total cost:".bright_white().dimmed(), 
-                                metrics.cost_usd.to_string().bright_yellow());
-                        }
-                    }
-                }
-                
-                if let Some(recommended) = &providers_info.recommended_provider {
-                    println!();
-                    println!("{} {}", "🏆 Recommended provider:".bright_yellow().bold(), 
-                        recommended.bright_green().bold());
-                }
+            if let Some(version) = response.get("version").and_then(|v| v.as_str()) {
+                println!("  {} {}", "Version:".bright_white(), version.bright_cyan());
             }
             
+            if let Some(uptime) = response.get("uptime_seconds").and_then(|u| u.as_u64()) {
+                let hours = uptime / 3600;
+                let minutes = (uptime % 3600) / 60;
+                let seconds = uptime % 60;
+                println!("  {} {}h {}m {}s", "Uptime:".bright_white(), hours, minutes, seconds);
+            }
         }
         Err(e) => {
-            pb.finish_and_clear();
-            println!("{} Failed to connect to UAIDA server", "❌".bright_red());
-            println!("   {}", e.to_string().bright_red());
-            println!();
-            println!("{}", "💡 Troubleshooting:".bright_yellow().bold());
-            println!("  • Make sure the UAIDA server is running");
-            println!("  • Check the server URL in your configuration");
-            println!("  • Verify network connectivity");
-            println!("  • Try: {}", "uaida config show".bright_green());
+            println!("  {} {}", "Status:".bright_white(), "Unhealthy".bright_red().bold());
+            println!("  {} {}", "Error:".bright_white(), e.to_string().bright_red());
+            return Ok(());
+        }
+    }
+
+    println!();
+
+    // Provider status
+    if health {
+        println!("{}", "🔌 Provider Health".bright_white().bold());
+        match client.get("/api/v1/providers/health").await {
+            Ok(providers) => {
+                if let Some(provider_list) = providers.as_array() {
+                    for provider in provider_list {
+                        if let (Some(name), Some(status)) = (
+                            provider.get("name").and_then(|n| n.as_str()),
+                            provider.get("status").and_then(|s| s.as_str())
+                        ) {
+                            let status_icon = match status {
+                                "healthy" => "✅".bright_green(),
+                                "degraded" => "⚠️".bright_yellow(),
+                                "unhealthy" => "❌".bright_red(),
+                                _ => "❓".bright_white(),
+                            };
+                            println!("  {} {} ({})", status_icon, name.bright_cyan(), status);
+                            
+                            if detailed {
+                                if let Some(latency) = provider.get("latency_ms").and_then(|l| l.as_u64()) {
+                                    println!("    {} {}ms", "Latency:".bright_white(), latency);
+                                }
+                                if let Some(success_rate) = provider.get("success_rate").and_then(|s| s.as_f64()) {
+                                    println!("    {} {:.1}%", "Success Rate:".bright_white(), success_rate * 100.0);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    println!("  {} No provider data available", "⚠️".bright_yellow());
+                }
+            }
+            Err(e) => {
+                println!("  {} Failed to get provider status: {}", "❌".bright_red(), e);
+            }
+        }
+        println!();
+    }
+
+    // System metrics
+    if detailed {
+        println!("{}", "📈 System Metrics".bright_white().bold());
+        match client.get("/metrics").await {
+            Ok(_) => {
+                println!("  {} Metrics endpoint available", "✅".bright_green());
+                println!("  {} View at: {}", "🔗".bright_blue(), "http://localhost:8080/metrics".bright_cyan());
+            }
+            Err(_) => {
+                println!("  {} Metrics endpoint unavailable", "❌".bright_red());
+            }
+        }
+        println!();
+
+        // Configuration status
+        println!("{}", "⚙️ Configuration".bright_white().bold());
+        
+        // Check if config file exists
+        match crate::config::Config::default_config_path() {
+            Ok(config_path) => {
+                if config_path.exists() {
+                    println!("  {} Configuration file found", "✅".bright_green());
+                    println!("    {} {}", "Path:".bright_white(), config_path.display().to_string().bright_cyan());
+                    
+                    // Load and show basic config info
+                    if let Ok(config) = crate::config::Config::load(None) {
+                        let enabled_providers = config.get_enabled_providers();
+                        println!("    {} {}", "Enabled Providers:".bright_white(), enabled_providers.len());
+                        for provider in enabled_providers {
+                            println!("      • {}", provider.bright_cyan());
+                        }
+                    }
+                } else {
+                    println!("  {} No configuration file found", "⚠️".bright_yellow());
+                    println!("    {} Run 'uaida init' to create configuration", "💡".bright_blue());
+                }
+            }
+            Err(e) => {
+                println!("  {} Failed to check configuration: {}", "❌".bright_red(), e);
+            }
         }
     }
 
