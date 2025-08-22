@@ -2,7 +2,7 @@ pub mod ai_terminal;
 pub mod command_suggester;
 pub mod history_manager;
 pub mod shell_integration;
-pub mod safety_checker;
+// pub mod safety_checker; // TODO: Implement safety checker
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

@@ -48,7 +48,6 @@ CREATE INDEX idx_completion_logs_is_accepted ON completion_logs(is_accepted);
 -- Composite indexes for analytics queries
 CREATE INDEX idx_completion_logs_user_provider ON completion_logs(user_id, provider);
 CREATE INDEX idx_completion_logs_project_language ON completion_logs(project_id, language);
-CREATE INDEX idx_completion_logs_date_provider ON completion_logs(DATE(created_at), provider);
 
 -- Partial indexes for performance
 CREATE INDEX idx_completion_logs_successful ON completion_logs(created_at) WHERE status = 'completed';

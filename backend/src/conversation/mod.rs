@@ -89,7 +89,7 @@ pub enum SessionType {
     Learning,
     Debugging,
     ProjectPlanning,
-    Pair Programming,
+    PairProgramming,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

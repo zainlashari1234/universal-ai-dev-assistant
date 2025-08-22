@@ -1,5 +1,5 @@
 pub mod sso;
-pub mod rbac;
+// pub mod rbac; // TODO: Implement RBAC module
 pub mod jwt;
 pub mod middleware;
 pub mod audit;
@@ -11,6 +11,7 @@ pub mod preferences;
 pub mod preferences_handlers;
 
 pub use sso::*;
+pub mod rbac;
 pub use rbac::*;
 pub use jwt::*;
 pub use middleware::*;

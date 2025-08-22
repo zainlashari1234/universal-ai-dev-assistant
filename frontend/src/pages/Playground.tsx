@@ -8,7 +8,7 @@ import {
   CpuChipIcon,
   BoltIcon
 } from '@heroicons/react/24/outline';
-import { StreamingCompletion } from '../components/StreamingCompletion';
+import { StreamingCompletion } from '../components/StreamingCompletion.tsx';
 
 const Playground: React.FC = () => {
   const [prompt, setPrompt] = useState('');
@@ -378,4 +378,5 @@ const Playground: React.FC = () => {
   );
 };
 
+export { Playground };
 export default Playground;

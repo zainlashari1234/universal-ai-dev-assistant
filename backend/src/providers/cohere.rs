@@ -1,4 +1,5 @@
 use super::traits::{AIProvider, AnalysisRequest, AnalysisResponse, CompletionRequest, CompletionResponse, HealthCheck, ProviderError};
+use futures_util::StreamExt;
 use crate::config::ProviderConfig;
 use async_trait::async_trait;
 use reqwest::Client;
@@ -169,8 +170,71 @@ impl AIProvider for CohereProvider {
         &self,
         _request: CompletionRequest,
     ) -> Result<tokio::sync::mpsc::Receiver<Result<String, ProviderError>>, ProviderError> {
-        // TODO: Implement Cohere streaming
-        Err(ProviderError::ApiError("Streaming not yet implemented for Cohere".to_string()))
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        
+        let client = self.client.clone();
+        let api_key = self.api_key.clone();
+        let base_url = self.base_url.clone();
+        let request = request.clone();
+        
+        tokio::spawn(async move {
+            let mut payload = serde_json::json!({
+                "model": request.model,
+                "message": request.prompt,
+                "stream": true,
+                "max_tokens": request.max_tokens.unwrap_or(1000),
+                "temperature": request.temperature.unwrap_or(0.7)
+            });
+
+            if let Some(system) = request.system_prompt {
+                payload["preamble"] = serde_json::Value::String(system);
+            }
+
+            match client
+                .post(&format!("{}/chat", base_url))
+                .header("Authorization", format!("Bearer {}", api_key))
+                .header("Content-Type", "application/json")
+                .json(&payload)
+                .send()
+                .await
+            {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        let mut stream = response.bytes_stream();
+                        while let Some(chunk) = stream.next().await {
+                            match chunk {
+                                Ok(bytes) => {
+                                    let text = String::from_utf8_lossy(&bytes);
+                                    for line in text.lines() {
+                                        if line.starts_with("data: ") {
+                                            let data = &line[6..];
+                                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                                                if let Some(content) = json["text"].as_str() {
+                                                    if tx.send(Ok(content.to_string())).await.is_err() {
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    let _ = tx.send(Err(ProviderError::NetworkError(e.to_string()))).await;
+                                    break;
+                                }
+                            }
+                        }
+                    } else {
+                        let _ = tx.send(Err(ProviderError::ApiError("Streaming failed".to_string()))).await;
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(ProviderError::NetworkError(e.to_string()))).await;
+                }
+            }
+        });
+        
+        Ok(rx)
     }
 
     async fn analyze_code(&self, request: AnalysisRequest) -> Result<AnalysisResponse, ProviderError> {

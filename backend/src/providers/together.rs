@@ -1,4 +1,5 @@
 use super::traits::{AIProvider, AnalysisRequest, AnalysisResponse, CompletionRequest, CompletionResponse, HealthCheck, ProviderError};
+use futures_util::StreamExt;
 use crate::config::ProviderConfig;
 use async_trait::async_trait;
 use reqwest::Client;
@@ -222,8 +223,34 @@ impl AIProvider for TogetherProvider {
             {
                 Ok(response) => {
                     if response.status().is_success() {
-                        // TODO: Implement SSE parsing for streaming
-                        let _ = tx.send(Ok("Streaming not fully implemented yet".to_string())).await;
+                        // Parse SSE streaming response
+                        let mut stream = response.bytes_stream();
+                        while let Some(chunk) = stream.next().await {
+                            match chunk {
+                                Ok(bytes) => {
+                                    let text = String::from_utf8_lossy(&bytes);
+                                    for line in text.lines() {
+                                        if line.starts_with("data: ") {
+                                            let data = &line[6..];
+                                            if data == "[DONE]" {
+                                                break;
+                                            }
+                                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                                                if let Some(content) = json["choices"][0]["delta"]["content"].as_str() {
+                                                    if tx.send(Ok(content.to_string())).await.is_err() {
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    let _ = tx.send(Err(ProviderError::NetworkError(e.to_string()))).await;
+                                    break;
+                                }
+                            }
+                        }
                     } else {
                         let _ = tx.send(Err(ProviderError::ApiError("Streaming failed".to_string()))).await;
                     }

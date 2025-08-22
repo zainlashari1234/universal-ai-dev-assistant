@@ -10,6 +10,10 @@ pub mod orchestrator;
 pub mod test_first;
 pub mod security_analyzer;
 pub mod advanced_risk;
+pub mod agent_communication;
+pub mod agent_personality;
+pub mod dynamic_agent_factory;
+pub mod knowledge_mesh;
 
 pub use planner::*;
 pub use retriever::*;
@@ -23,6 +27,10 @@ pub use orchestrator::*;
 pub use test_first::*;
 pub use security_analyzer::*;
 pub use advanced_risk::*;
+pub use agent_communication::*;
+pub use agent_personality::*;
+pub use dynamic_agent_factory::*;
+pub use knowledge_mesh::*;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

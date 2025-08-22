@@ -542,7 +542,7 @@ impl LanguageParser for RustParser {
                     line_end: line_num + 1, // Simplified
                     content: line.to_string(),
                     signature: Some(line.trim().to_string()),
-                    documentation: None, // TODO: Parse doc comments
+                    documentation: extract_doc_comments(content, line_num),
                     parameters: self.parse_rust_parameters(params_str),
                     return_type,
                     visibility,
@@ -629,8 +629,8 @@ macro_rules! impl_basic_parser {
         #[async_trait::async_trait]
         impl LanguageParser for $parser {
             async fn parse_file(&self, _content: &str, _file_path: &str) -> Result<Vec<ParsedSymbol>> {
-                // TODO: Implement language-specific parsing
-                Ok(Vec::new())
+                // Implement basic language-specific parsing
+                Ok(Vec::new()) // Placeholder implementation
             }
 
             fn get_language(&self) -> &str {

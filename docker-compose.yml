@@ -37,6 +37,8 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: uaida-postgres
+    ports:
+      - "5432:5432"
     environment:
       - POSTGRES_DB=uaida
       - POSTGRES_USER=uaida

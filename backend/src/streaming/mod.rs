@@ -209,7 +209,7 @@ impl StreamingManager {
                     stream_id: stream_id.clone(),
                     total_tokens: Self::calculate_total_tokens(&streams, &stream_id),
                     total_cost: Self::calculate_total_cost(&streams, &stream_id),
-                    completion_time: Self::calculate_completion_time(&streams, &stream_id)
+                    completion_time: Self::calculate_completion_time(&streams, &stream_id),
                     quality_metrics: QualityMetrics {
                         coherence_score: 0.9,
                         relevance_score: 0.85,

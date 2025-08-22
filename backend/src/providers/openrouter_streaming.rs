@@ -6,7 +6,6 @@ use futures_util::{Stream, StreamExt};
 use reqwest::Client;
 use serde_json::json;
 use std::pin::Pin;
-use tokio_stream::wrappers::LinesStream;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 pub struct OpenRouterStreaming {

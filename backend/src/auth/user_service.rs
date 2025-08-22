@@ -178,7 +178,7 @@ impl UserService {
             name: user_row.full_name.unwrap_or_else(|| user_row.username.clone()),
             organization_id: self.get_or_create_default_organization(user_row.id).await?,
             roles: self.get_user_roles(user_row.id).await?,
-            permissions: self.get_user_permissions(user_row.id).await?
+            permissions: self.get_user_permissions(user_row.id).await?,
             created_at: user_row.created_at,
             last_login: user_row.last_login_at,
             is_active: user_row.is_active,
@@ -379,7 +379,7 @@ impl UserService {
             && password.chars().any(|c| c.is_uppercase())
             && password.chars().any(|c| c.is_lowercase())
             && password.chars().any(|c| c.is_numeric())
-            password.chars().any(|c| !c.is_alphanumeric())
+            && password.chars().any(|c| !c.is_alphanumeric())
     }
 
     async fn get_or_create_default_organization(&self, user_id: Uuid) -> Result<Uuid> {

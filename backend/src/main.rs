@@ -466,7 +466,7 @@ async fn completion_handler(
         max_tokens: request.max_tokens,
         temperature: request.temperature,
         system_prompt: request.system_prompt,
-        stream: request.stream.unwrap_or(false),
+        stream: Some(request.stream.unwrap_or(false)),
     };
 
     // Process completion

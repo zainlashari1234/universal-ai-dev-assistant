@@ -244,7 +244,7 @@ COPY . .
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
             stderr: String::from_utf8_lossy(&output.stderr).to_string(),
             execution_time,
-            memory_used: None, // TODO: Extract from Docker stats
+            memory_used: Some(self.extract_memory_usage(&container_id).await.unwrap_or(0)),
             coverage,
             artifacts,
         };

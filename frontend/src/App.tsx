@@ -1,13 +1,13 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { Navbar } from './components/Navbar';
-import { Dashboard } from './pages/Dashboard';
-import { Playground } from './pages/Playground';
-import { Settings } from './pages/Settings';
-import { Analytics } from './pages/Analytics';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
+import { AuthProvider, useAuth } from './contexts/AuthContext.tsx';
+import { Navbar } from './components/Navbar.tsx';
+import { Dashboard } from './pages/Dashboard.tsx';
+import { Playground } from './pages/Playground.tsx';
+import { Settings } from './pages/Settings.tsx';
+import { Analytics } from './pages/Analytics.tsx';
+import { Login } from './pages/Login.tsx';
+import { Register } from './pages/Register.tsx';
 import './App.css';
 
 // Protected Route Component

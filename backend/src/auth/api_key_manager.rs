@@ -195,9 +195,7 @@ impl ApiKeyManager {
                     r#"
                     SELECT COUNT(*)
                     FROM completion_logs cl
-                    WHERE cl.run_id IN (
-                        SELECT r.id FROM runs r WHERE r.user_id = $1
-                    )
+                    WHERE cl.user_id = $1
                     AND DATE_TRUNC('month', cl.created_at) = DATE_TRUNC('month', NOW())
                     "#,
                     user_id
@@ -247,8 +245,7 @@ impl ApiKeyManager {
             r#"
             SELECT ak.provider, COUNT(cl.id) as usage_count
             FROM api_keys ak
-            LEFT JOIN runs r ON r.user_id = ak.user_id
-            LEFT JOIN completion_logs cl ON cl.run_id = r.id
+            LEFT JOIN completion_logs cl ON cl.user_id = ak.user_id
             WHERE ak.user_id = $1 AND ak.is_active = true
             AND DATE_TRUNC('month', cl.created_at) = DATE_TRUNC('month', NOW())
             GROUP BY ak.provider
