@@ -123,14 +123,23 @@ jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Rust Security Audit
-      uses: actions-rs/audit-check@v1
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+    
+    - name: Run Rust Security Audit
+      working-directory: ./backend
+      run: cargo audit
     
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -150,6 +159,10 @@ jobs:
     
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+    
+    - name: Create Cargo.lock for backend
+      working-directory: ./backend
+      run: cargo generate-lockfile
     
     - name: Build backend image
       uses: docker/build-push-action@v5
